@@ -2,6 +2,7 @@
 use strict;
 use warnings;
 use File::Copy;
+use Getopt::Long;
 
 #USAGE: species_num tree_num birth_rate death_rate sampling_fraction mutation_rate
 
@@ -48,7 +49,7 @@ sub EXTEIN_TREE{
   system("1"); #includes branch length from birth-death process
   system("$birth_rate\ $death_rate\ $sample_fraction\ $mutation_rate"); #see variable name
   #output will be evolver.out
-  
+
 }
 
 
