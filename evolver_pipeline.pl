@@ -6,8 +6,9 @@ use Getopt::Long;
 
 #NEXT STEPS
 #I might need to estimate parameters from a tree using MrBayes...
-
-
+#Add a process for jumping the intein between exteins that isn't totally random...
+#maybe use a normal distribution to determine the chances of jumping between a current branch and a nearby one? 
+#BUT Make it so that every once in a while  there is a chance it will jump very far away 
 
 #USAGE: species_num tree_num birth_rate death_rate sampling_fraction mutation_rate
 
