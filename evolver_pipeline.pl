@@ -10,6 +10,11 @@ use Getopt::Long;
 #maybe use a normal distribution to determine the chances of jumping between a current branch and a nearby one? 
 #BUT Make it so that every once in a while  there is a chance it will jump very far away 
 
+#To make this work, will need the following:
+#-Function to determine the distanc between two tips on a tree
+#-Function to determine where the intein will jump to based on a probability distribution influenced by the patristic distances
+#-Subroutine that, starting from 1 sequence progressively allows the intein to jump to new nodes on the tree 1 -> 2 -> 4.... 50 until the desired number is hit
+
 #USAGE: species_num tree_num birth_rate death_rate sampling_fraction mutation_rate
 
 #GLOBALS
