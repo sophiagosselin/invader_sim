@@ -441,7 +441,9 @@ sub accept_or_deny_move{
   #prob of acceptance based on dist.
   my $probability_of_acceptance = ($lambda*(exp(-$lambda*$lenght_to_new_position)));
 
+  #second uniform random
   my $uniform_random_deviant = rand();
+
   #compare uniform random to prob of acceptance. If lower, new position is accpeted!
   if($uniform_random_deviant <= $probability_of_acceptance){
     return(1);
