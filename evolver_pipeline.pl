@@ -58,14 +58,15 @@ sub MAIN{
 
   #ask the user for max jump size when invading from one extein tip to another
   print "Preparing intein invasion simulation.
-  What window size would you like to constrain intein invasions to?\n
+  What window size would you like to constrain intein invasions to?
+  Importantly, in an extein tree with n tips, and x inteins, this window should be at most n-x wide.\n
   For example, in a tree with 10 tips, a window of 5 would allow the intein to invade any of the closest 5 tips to its current position.\n"
   my $window_size = <STDIN>;
   chomp $window_size;
 
   #simulates intein invasion
-  #returns a nested hash in the following formate:
-  #tree file -> extein-> intein
+  #returns a nested hash in the following format:
+  #$extein tree -> {"tips"/"intein_tree"} -> {$extein_tips/$intein_file_name} -> $invading_intein
   my %paired_invasion_data = invade_exteins($window_size,\%paired_intein_extein_trees);
 
   #now simulate sequence evolution based on the phylogenies
@@ -76,13 +77,16 @@ sub MAIN{
   #now invade extein sequences with intein sequences
   insert_sequences($extein_size,\%paired_invasion_data,\%paired_extein_tree_and_sequence_files,\%paired_intein_tree_and_sequence_files);
 
+  print "Simulation finished! Find the fasta files of invaded extein sequences with their un-invaded counterparts in the 'invaded_sequences' directory.\n";
 }
 
 sub test_parameters{
   #takes tree type as input, returns user determined inputs for that tree type.
   my $tree_type = shift;
   my $user_check = "N";
-  my $input_primer_append = "Please input parameters for the $tree_type phylogeny now!\n"."$input_primer";
+  my $input_primer_append = "Please input parameters for the $tree_type phylogeny now!
+  Remember that the extein tree should have at least 2x the amount of taxa as the intein tree.
+  (This is critical for the method in which this software simulates intein invasion)\n\n"."$input_primer";
   %inputs = parse_and_check_inputs($input_primer_append);
   #begin parameter testing for phylogeny of interest
   print "Beginning extein simulation parameters test.\n Testing will conclude once the user is happy with the tree and set parameters.\n"
@@ -275,8 +279,9 @@ sub invade_exteins{
     #in theory, the %paired_sequence_archive hash now has the paired inteins and exteins\
     #now nest that data into the hash to be returned
     foreach my $extein (keys %paired_sequence_archive){
-      $trees_with_invasion_data{$extein_tree}={$extein}=$paired_sequence_archive{$extein};
+      $trees_with_invasion_data{$extein_tree}={"tips"}={$extein}=$paired_sequence_archive{$extein};
     }
+    $trees_with_invasion_data{$extein_tree}={"intein_tree"}=$tree_samples{$extein_tree};
     #now loop to the top for all other trees in the set!
   }
   return(%trees_with_invasion_data);
@@ -535,10 +540,10 @@ sub simulate_sequences_from_tree{
       $out->write_aln($aln);
     }
     chdir("..");
-    chdir("..");
     $return_hash{$tree}="simulated_sequences/$counter/$tree.fasta";
     $counter++;
   }
+  chdir("..");
   return($num_of_nucs,%return_hash);
 }
 
@@ -551,6 +556,64 @@ sub insert_sequences{
   my %extein_files = %{my $hashref2 = shift};
   my %intein_files = %{my $hashref3 = shift};
 
-  #THE END IS NEAR
+  #select a random position to insert the intein into within the extein.
+  #in order to be approximately similar to real life invasions, the invasion site
+  #is placed within the 2nd or 3rd quartile of the sequence length
+  my $quartile = int($extein_length/4);
+  my $random_half = int(rand(($extein_length/2)));
+  my $insertion_position = $random_half+$quartile;
 
+  #foreach extein tree file insert intein sequences into extein sequences in accordance with the invasion
+  foreach my $invaded_extein_tree (keys %invasion_data){
+    #get paire file information
+    my $paired_intein_tree_file = $invasion_data{$invaded_extein_tree}{"intein_tree"};
+    my $extein_sequence_file = $extein_files{$invaded_extein_tree};
+    my $intein_sequence_file = $intein_files{$paired_intein_tree_file};
+
+    #readin fasta files to memory
+    my %extein_sequences = readin_fasta($extein_sequence_file);
+    my %intein_sequences = readin_fasta($intein_sequence_file );
+
+    #foreach extein sequence tip associated with the tree, insert the associated intein sequence
+    foreach my $invaded_extein_tip (keys %{$invasion_data{{$invaded_extein_tree}{"tips"}}}){
+      #variable name makes sense shortly
+      my $extein_left_sequence = $extein_sequences{$invaded_extein_tip};
+      my $extein_right_sequence = substr $extein_left_sequence, 0, $insertion_position, '';
+      my $intein_name = $invasion_data{$invaded_extein_tree}{"tips"}{$invaded_extein_tip};
+      my $intein_sequnece = $intein_sequences{$intein_name};
+      my $extein_w_intein_sequence = $extein_left_sequence.$intein_sequnece.$extein_right_sequence;
+      delete($extein_sequences{$invaded_extein_tip});
+      my $new_tip_name = $invaded_extein_tip."_w_intein";
+      $extein_sequences{$new_tip_name}=$extein_w_intein_sequence;
+    }
+
+    #print invaded and uninvaded extein seuqneces to file
+    mkdir("invaded_sequences");
+    open(OUT, "+> $extein_sequence_file.invaded");
+    foreach my $accession (keys %extein_sequences){
+      print OUT "\>$accession\n";
+      print OUT "$extein_sequences{$accession}\n";
+    }
+    close OUT;
+  }
+}
+
+sub readin_fasta{
+  my $infile = shift;
+  my $accession="";
+  my %sequences;
+  open(IN, "< $infile");
+  while(<IN>){
+    chomp;
+    if($_=~/\>/){
+      $accession=$_;
+      $sequences{$accession}="";
+      $counter++;
+    }
+    else{
+      $sequences{$accession}.=$_;
+    }
+  }
+  close IN;
+  return(%sequences);
 }
