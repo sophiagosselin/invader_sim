@@ -6,21 +6,9 @@ use Getopt::Long;
 use Bio::TreeIO;
 use Bio::AlignIO;
 
-#NEXT STEPS
-#I might need to estimate parameters from a tree using MrBayes...
-#Add a process for jumping the intein between exteins that isn't totally random...
-#maybe use a normal distribution to determine the chances of jumping between a current branch and a nearby one?
-#BUT Make it so that every once in a while  there is a chance it will jump very far away
-
-#To make this work, will need the following:
-#-Function to determine the distanc between two tips on a tree
-#-Function to determine where the intein will jump to based on a probability distribution influenced by the patristic distances
-#-Subroutine that, starting from 1 sequence progressively allows the intein to jump to new nodes on the tree 1 -> 2 -> 4.... 50 until the desired number is hit
-
-#USAGE: species_num tree_num birth_rate death_rate sampling_fraction mutation_rate
+#USAGE: perl evolver_pipeline.pl
 
 #GLOBALS
-my $random_seed = int rand(1000000000);
 my($species_number,$tree_number,$birth_rate,$death_rate,$sample_fraction,$mutation_rate,%inputs);
 my $input_primer = "Parameters should be in the following format:\n
 sp - # of species.
@@ -114,7 +102,7 @@ sub parse_and_check_inputs{
                 "death_rate" => $death_rate,
                 "sample_fraction" => $sample_fraction,
                 "muation_rate" => $mutation_rate);
-    #check input variables
+  #check input variables
   foreach my $input (keys %inputs_for_tree){
     if(!defined $inputs_for_tree{$input}){
       print "$input is not defined. Please define it now:";
@@ -179,10 +167,15 @@ sub simulate_n_trees{
 
 sub simulate_1_tree{
   #simulated a tree based on parameters provided
+  #first generates a random seed and ensures it is an odd value
+  my $random_tree_seed = int rand(1000000000);
+  if(0 == $random_tree_seed % 2){
+    $random_tree_seed++;
+  }
   open(my $evolver_pipe, '|-', 'paml-evolver') or die "Could not open pipe to paml-evolver: $!\n";
   print $evolver_pipe "1\n"; #uses random unrooted tree option
   print $evolver_pipe "$species_number\n"; #species number in tree
-  print $evolver_pipe "$tree_number $random_seed\n"; #number of trees and random seed
+  print $evolver_pipe "$tree_number $random_tree_seed\n"; #number of trees and random seed
   print $evolver_pipe "1\n"; #includes branch length from birth-death process
   print $evolver_pipe "$birth_rate $death_rate $sample_fraction $mutation_rate\n"; #see variable name
   print $evolver_pipe "0\n";
