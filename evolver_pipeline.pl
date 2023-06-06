@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use File::Copy;
 use Getopt::Long;
-use Bio::TreeIO
+use Bio::TreeIO;
 use Bio::AlignIO;
 
 #NEXT STEPS
@@ -52,7 +52,7 @@ sub MAIN{
   #pair each extein tree with a random intein tree. Each pairing constitutes a sample
   my %paired_intein_extein_trees;
   foreach my $extein_tree (@extein_phylogenies){
-    my $random_intein_tree = splice(@intein_phylogenies,@intein_phylogenies[rand($intein_phylogenies)],1);
+    my $random_intein_tree = splice(@intein_phylogenies,@intein_phylogenies[rand($#intein_phylogenies)],1);
     $paired_intein_extein_trees{$extein_tree}=$random_intein_tree;
   }
 
@@ -60,7 +60,7 @@ sub MAIN{
   print "Preparing intein invasion simulation.
   What window size would you like to constrain intein invasions to?
   Importantly, in an extein tree with n tips, and x inteins, this window should be at most n-x wide.\n
-  For example, in a tree with 10 tips, a window of 5 would allow the intein to invade any of the closest 5 tips to its current position.\n"
+  For example, in a tree with 10 tips, a window of 5 would allow the intein to invade any of the closest 5 tips to its current position.\n";
   my $window_size = <STDIN>;
   chomp $window_size;
 
@@ -72,7 +72,7 @@ sub MAIN{
   #now simulate sequence evolution based on the phylogenies
   #returns a hash of the sequence file associated with the tree file
   my ($extein_size,%paired_extein_tree_and_sequence_files) = simulate_sequences_from_tree("extein",$extein_inputs{"species_number"},@extein_phylogenies);
-  my ($intein_size,%paired_intein_tree_and_sequence_files) = simulate_sequences_from_tree("intein,"$intein_inputs{"species_number"},@intein_phylogenies);
+  my ($intein_size,%paired_intein_tree_and_sequence_files) = simulate_sequences_from_tree("intein",$intein_inputs{"species_number"},@intein_phylogenies);
 
   #now invade extein sequences with intein sequences
   insert_sequences($extein_size,\%paired_invasion_data,\%paired_extein_tree_and_sequence_files,\%paired_intein_tree_and_sequence_files);
@@ -89,7 +89,7 @@ sub test_parameters{
   (This is critical for the method in which this software simulates intein invasion)\n\n"."$input_primer";
   %inputs = parse_and_check_inputs($input_primer_append);
   #begin parameter testing for phylogeny of interest
-  print "Beginning extein simulation parameters test.\n Testing will conclude once the user is happy with the tree and set parameters.\n"
+  print "Beginning extein simulation parameters test.\n Testing will conclude once the user is happy with the tree and set parameters.\n";
   parameter_testing_loop($user_check,$tree_type);
   #save parameters settled on
   my %downstream_inputs =  %inputs;
@@ -210,24 +210,24 @@ sub write_tree{
 sub show_pdf {
   #takes pdf file as input. Then displays PDF to screen
   my $pdf_file = shift;
-  my $pdf_txt;
+  my $pdf_text;
   open (my $fh, $pdf_file);
   # set the file handle to binary mode
   binmode $fh;
   # read it all into a string;
   while (<$fh>){
-    $pdf_txt .= $_;
+    $pdf_text .= $_;
   }
   close ($fh);
 
   #takes string and displays PDF
   my $method = "Content-disposition:inline; filename='$pdf_file'"; # default method
-  my $size = length($pdf);
+  my $size = length($pdf_text);
   print "Content-Type: application/pdf\n";
   print "Content-Length: $size\n";
   print "$method\n";
   print "Content-Transfer-Encoding: binary\n\n"; # blank line to separate headers
-  print $pdf;
+  print $pdf_text;
 }
 
 sub invade_exteins{
@@ -248,9 +248,9 @@ sub invade_exteins{
 
     #select a random intein and random extein to invade w/ said intein
     #then remove them from the list of valid invaders/invasion sites
-    my $intein_tip = @intein_tips[rand($intein_tips)];
-    @intein_tips = remove_array_element($closest_intein,@intein_tips);
-    my $extein_tip = @extein_tips[rand($extein_tips)];
+    my $intein_tip = @intein_tips[rand($#intein_tips)];
+    @intein_tips = remove_array_element($intein_tip,@intein_tips);
+    my $extein_tip = @extein_tips[rand($#extein_tips)];
     @extein_tips = remove_array_element($extein_tip,@extein_tips);
     my %paired_sequence_archive;
     $paired_sequence_archive{$extein_tip}=$intein_tip;
@@ -258,7 +258,7 @@ sub invade_exteins{
     #take the random intein/extein pair as the starting point and begin the MC chain
     #effectively treats each infected tip as a seperate chain until all inteins have infected an extein
     until(!@intein_tips){
-      my %paired_sequences = %paired_sequence_archive
+      my %paired_sequences = %paired_sequence_archive;
       foreach my $infected (keys %paired_sequences){
         #stop infecting if all inteins have infected
         next if(!@intein_tips);
@@ -279,9 +279,9 @@ sub invade_exteins{
     #in theory, the %paired_sequence_archive hash now has the paired inteins and exteins\
     #now nest that data into the hash to be returned
     foreach my $extein (keys %paired_sequence_archive){
-      $trees_with_invasion_data{$extein_tree}={"tips"}={$extein}=$paired_sequence_archive{$extein};
+      $trees_with_invasion_data{$extein_tree}{"tips"}{$extein}=$paired_sequence_archive{$extein};
     }
-    $trees_with_invasion_data{$extein_tree}={"intein_tree"}=$tree_samples{$extein_tree};
+    $trees_with_invasion_data{$extein_tree}{"intein_tree"}=$tree_samples{$extein_tree};
     #now loop to the top for all other trees in the set!
   }
   return(%trees_with_invasion_data);
@@ -320,8 +320,8 @@ sub get_distances_from_tip{
   #returns a hash of key2's with the associated distance to key1
   my $key1 = shift;
   my %distance_hash = %{my $hashref = shift};
+  my %return_hash;
   foreach my $key (keys %distance_hash){
-    my %return_hash;
     foreach my $key2 (keys %{$distance_hash{$key1}}){
       next if($key2 eq $key);
       $return_hash{$key2}=$distance_hash{$key1}->{$key2};
@@ -336,12 +336,12 @@ sub get_smallest_distance{
   #returns the key2 with the smallest distance to key1
   my $key1 = shift;
   my %distance_hash = %{my $hashref = shift};
+  my $key_holder;
   foreach my $key (keys %distance_hash){
     next if($key ne $key1);
     my $smallest = "toggle";
-    my $key_holder;
     foreach my $key2 (keys %{$distance_hash{$key1}}){
-      if(!$smallest="toggle"){
+      if(!$smallest eq "toggle"){
         if($smallest < $distance_hash{$key1}->{$key2}){
           next;
         }
@@ -383,7 +383,7 @@ sub pairwise_patristic_distance{
   foreach my $tip (@array_of_tips){
     foreach my $tip_to_compare (@array_of_tips){
       my $node_distance = get_patristic_distance($tip,$tip_to_compare);
-      $distances{$tip}={$tip_to_compare}=$node_distance;
+      $distances{$tip}{$tip_to_compare}=$node_distance;
     }
   }
   return(%distances);
@@ -577,7 +577,7 @@ sub insert_sequences{
     my %intein_sequences = readin_fasta($intein_sequence_file );
 
     #foreach extein sequence tip associated with the tree, insert the associated intein sequence
-    foreach my $invaded_extein_tip (keys %{$invasion_data{{$invaded_extein_tree}{"tips"}}}){
+    foreach my $invaded_extein_tip (keys %{$invasion_data{$invaded_extein_tree}{"tips"}}){
       #variable name makes sense shortly
       my $extein_left_sequence = $extein_sequences{$invaded_extein_tip};
       my $extein_right_sequence = substr $extein_left_sequence, 0, $insertion_position, '';
@@ -610,7 +610,6 @@ sub readin_fasta{
     if($_=~/\>/){
       $accession=$_;
       $sequences{$accession}="";
-      $counter++;
     }
     else{
       $sequences{$accession}.=$_;
