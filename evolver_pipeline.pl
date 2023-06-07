@@ -551,15 +551,15 @@ sub insert_sequences{
   my %extein_files = %{my $hashref2 = shift};
   my %intein_files = %{my $hashref3 = shift};
 
-  #select a random position to insert the intein into within the extein.
-  #in order to be approximately similar to real life invasions, the invasion site
-  #is placed within the 2nd or 3rd quartile of the sequence length
-  my $quartile = int($extein_length/4);
-  my $random_half = int(rand(($extein_length/2)));
-  my $insertion_position = $random_half+$quartile;
-
   #foreach extein tree file insert intein sequences into extein sequences in accordance with the invasion
   foreach my $invaded_extein_tree (keys %invasion_data){
+    #select a random position to insert the intein into within the extein.
+    #in order to be approximately similar to real life invasions, the invasion site
+    #is placed within the 2nd or 3rd quartile of the sequence length
+    my $quartile = int($extein_length/4);
+    my $random_half = int(rand(($extein_length/2)));
+    my $insertion_position = $random_half+$quartile;
+
     #get paire file information
     my $paired_intein_tree_file = $invasion_data{$invaded_extein_tree}{"intein_tree"};
     my $extein_sequence_file = $extein_files{$invaded_extein_tree};
