@@ -5,19 +5,21 @@ use File::Copy;
 use Getopt::Long;
 use Bio::TreeIO;
 use Bio::AlignIO;
+use Bio::Tree::TreeFunctionsI;
 
-#USAGE: perl evolver_pipeline.pl
+#USAGE: perl evolver_pipeline.pl "path or call for paml-evolver"
 
 #GLOBALS
-my($species_number,$tree_number,$birth_rate,$death_rate,$sample_fraction,$mutation_rate,%inputs);
-my $input_primer = "Parameters should be in the following format:\n
+my $evolver_call = $ARGV[0];
+my(%inputs);
+my $input_primer = "\n\n*******************************************************
+Parameters should be in the following format:\n
 sp - # of species.
-tn - # of trees.
 b - birth rate.
 d - death rate.
 sf - sample fraction.
 m - mutation rate.\n
-Example: sp 50 b 1 d 1 sf .1 m .01\n\n";
+Example: -sp 50 -b 1 -d 1 -sf .1 -m .01\n\n";
 
 #Code Start
 
@@ -29,7 +31,8 @@ sub MAIN{
   my %intein_inputs = test_parameters("intein");
 
   #once the user is satisfied with all parameters, ask for number of experiments to run
-  print "Parameters have been set; ready to run experiment.\n How many samples would you like to create?\n\n";
+  print "\n\n\******************************************************************
+  Parameters have been set; ready to run experiment.\n How many samples would you like to create?\n\n";
   my $number_of_samples = <STDIN>;
   chomp $number_of_samples;
 
@@ -40,15 +43,18 @@ sub MAIN{
   #pair each extein tree with a random intein tree. Each pairing constitutes a sample
   my %paired_intein_extein_trees;
   foreach my $extein_tree (@extein_phylogenies){
-    my $random_intein_tree = splice(@intein_phylogenies,@intein_phylogenies[rand($#intein_phylogenies)],1);
+    my $random_index = rand(@intein_phylogenies);
+    my $random_intein_tree = splice(@intein_phylogenies,$random_index,1);
     $paired_intein_extein_trees{$extein_tree}=$random_intein_tree;
   }
 
   #ask the user for max jump size when invading from one extein tip to another
-  print "Preparing intein invasion simulation.
-  What window size would you like to constrain intein invasions to?
-  Importantly, in an extein tree with n tips, and x inteins, this window should be at most n-x wide.\n
-  For example, in a tree with 10 tips, a window of 5 would allow the intein to invade any of the closest 5 tips to its current position.\n";
+  print "\n\n*******************************************************************
+  Preparing intein invasion simulation.
+  What window size would you like to constrain intein invasions to?\n
+    For a simulation with n exteins, and x inteins, this window (w) should follow this formulat:
+      w <= n-x\n
+  For example, in a tree with 10 tips, a window of 5 would allow the intein to invade any of the closest 5 tips to its current position.\n\n";
   my $window_size = <STDIN>;
   chomp $window_size;
 
@@ -91,21 +97,28 @@ sub parse_and_check_inputs{
   print($message);
   my $new_options = <STDIN>;
   chomp $new_options;
-  my @new_options_list = split /\s+/, $new_options;
-  GetOptions ('sp=s' => \$species_number, 'b=s' =>\$birth_rate,
-              'd=s' => \$death_rate, 'sf=s' => \$sample_fraction,
-              'm=s' => \$mutation_rate, @new_options_list);
-  #Dicitonary for checking input parameters
-  my %inputs_for_tree = ("species_number" => $species_number,
-                "tree_number" => $tree_number,
-                "birth_rate" => $birth_rate,
-                "death_rate" => $death_rate,
-                "sample_fraction" => $sample_fraction,
-                "muation_rate" => $mutation_rate);
+
+  # Split the user-provided options into individual arguments
+  my @options = split ' ', $new_options;
+
+  # Add the options as separate elements in @ARGV
+  @ARGV=();
+  push @ARGV, @options;
+
+  my %inputs_for_tree;
+   GetOptions(
+       'sp=i' => \$inputs_for_tree{'species_number'},
+       'b=s'  => \$inputs_for_tree{'birth_rate'},
+       'd=s'  => \$inputs_for_tree{'death_rate'},
+       'sf=s' => \$inputs_for_tree{'sample_fraction'},
+       'm=s'  => \$inputs_for_tree{'mutation_rate'}
+   );
+
   #check input variables
+  print "Checking Parameters\n";
   foreach my $input (keys %inputs_for_tree){
-    if(!defined $inputs_for_tree{$input}){
-      print "$input is not defined. Please define it now:";
+    if(!defined $inputs_for_tree{$input} || $inputs_for_tree{$input} eq 'undef'){
+      print "$input is not defined. Please define it now:\n";
       my $new_parameter = <STDIN>;
       chomp $new_parameter;
       $inputs_for_tree{$input}=$new_parameter;
@@ -125,7 +138,8 @@ sub parameter_testing_loop{
   if(uc($toggle) eq "N"){
     my $evolver_tree = simulate_1_tree();
     my $pdf_tree = write_tree($evolver_tree);
-    print "Does this simulated $tree_extension tree look good to you [Y/N]?\n";
+    print "\n\n*****************************************************************
+    Does this simulated $tree_extension tree look good to you [Y/N]?\n";
     $toggle = <STDIN>;
     chomp $toggle;
     if(uc($toggle) eq "N"){
@@ -157,7 +171,7 @@ sub simulate_n_trees{
   my @loop = (1..$simulation_num);
   foreach my $num (@loop){
     my $phylogeney = simulate_1_tree();
-    my $path_to_file = "$file_handle\$file_handle\_$num\.tree";
+    my $path_to_file = "$file_handle\/$file_handle\_$num\.tree";
     copy($phylogeney,$path_to_file);
     push(@tree_files,$path_to_file);
     unlink $phylogeney;
@@ -172,10 +186,19 @@ sub simulate_1_tree{
   if(0 == $random_tree_seed % 2){
     $random_tree_seed++;
   }
-  open(my $evolver_pipe, '|-', 'paml-evolver') or die "Could not open pipe to paml-evolver: $!\n";
+
+  #get input params from %inputs
+  my $species_number=$inputs{'species_number'};
+  my $tree_number=1;
+  my $birth_rate=$inputs{'birth_rate'};
+  my $death_rate=$inputs{'death_rate'};
+  my $sample_fraction=$inputs{'sample_fraction'};
+  my $mutation_rate=$inputs{'mutation_rate'};
+
+  open(my $evolver_pipe, '|-', $evolver_call) or die "Could not open pipe to paml-evolver: $!\n";
   print $evolver_pipe "1\n"; #uses random unrooted tree option
   print $evolver_pipe "$species_number\n"; #species number in tree
-  print $evolver_pipe "$tree_number $random_tree_seed\n"; #number of trees and random seed
+  print $evolver_pipe "1 $random_tree_seed\n"; #number of trees and random seed
   print $evolver_pipe "1\n"; #includes branch length from birth-death process
   print $evolver_pipe "$birth_rate $death_rate $sample_fraction $mutation_rate\n"; #see variable name
   print $evolver_pipe "0\n";
@@ -232,15 +255,18 @@ sub invade_exteins{
   my %tree_samples = %{my $hashref = shift};
   my %trees_with_invasion_data;
   foreach my $extein_tree (keys %tree_samples){
+    print "\n\nReading in trees to memory for paired sample $extein_tree and $tree_samples{$extein_tree}.\n\n";
     my($extein_tree_object,@extein_tips)=readin_newick($extein_tree);
     my($intein_tree_object,@intein_tips)=readin_newick($tree_samples{$extein_tree});
 
     #get pairwise distance between all nodes in intein and extein tree
+    print "Calculating pairwise patristic distance between tips.\n\n";
     my %extein_pairwise_distances= pairwise_patristic_distance($extein_tree_object,@extein_tips);
     my %intein_pairwise_distances= pairwise_patristic_distance($intein_tree_object,@intein_tips);
 
     #select a random intein and random extein to invade w/ said intein
     #then remove them from the list of valid invaders/invasion sites
+    print "Preparing starting point for invasion.\n\n";
     my $intein_tip = @intein_tips[rand($#intein_tips)];
     @intein_tips = remove_array_element($intein_tip,@intein_tips);
     my $extein_tip = @extein_tips[rand($#extein_tips)];
@@ -250,6 +276,8 @@ sub invade_exteins{
 
     #take the random intein/extein pair as the starting point and begin the MC chain
     #effectively treats each infected tip as a seperate chain until all inteins have infected an extein
+    print "Starting Monte-Carlo chain based invasion simulation.\n\n";
+    my @invaded_exteins;
     until(!@intein_tips){
       my %paired_sequences = %paired_sequence_archive;
       foreach my $infected (keys %paired_sequences){
@@ -257,18 +285,21 @@ sub invade_exteins{
         next if(!@intein_tips);
         #get next intein tip to invade with
         my $closest_intein = get_smallest_distance($paired_sequences{$infected},\%intein_pairwise_distances);
-        #gets all distances from current tip
-        my %distance_from_current_extein = get_distances_from_tip($infected,\%extein_pairwise_distances);
+        #gets all distances from current tip excluding those previously searched
+        my %distance_from_current_extein = get_distances_from_tip($infected,\%extein_pairwise_distances,@invaded_exteins);
         #returns accepted move/infection step
         $extein_tip = monte_carlo_chain($window,\%distance_from_current_extein,@extein_tips);
+        print "Step accepted. New extein invaded. Starting next step of chain shortly\m";
         #removes the intein that just invaded from list of inteins that need to infect a tip
         @intein_tips = remove_array_element($closest_intein,@intein_tips);
         #removes the just invaded extein as a valid move
         @extein_tips = remove_array_element($extein_tip,@extein_tips);
+        push(@invaded_exteins,$extein_tip);
         $paired_sequence_archive{$extein_tip}=$intein_tip;
       }
     }
 
+    print "Invasion for paired sample complete.\n\n";
     #in theory, the %paired_sequence_archive hash now has the paired inteins and exteins\
     #now nest that data into the hash to be returned
     foreach my $extein (keys %paired_sequence_archive){
@@ -283,40 +314,37 @@ sub invade_exteins{
 sub remove_array_element{
   #takes value in array and array as inputs
   #returns array without that value
-  my $index = 0;
   my $value_to_remove = shift;
   my @array = @_;
-  $index++ until $array[$index] eq $value_to_remove;
-  splice(@array, $index, 1);
+  my $index = 0;
+  foreach my $entry (@array){
+    if("$entry" eq "$value_to_remove"){
+      splice(@array, $index, 1);
+      last;
+    }
+    else{
+      $index++;
+      next;
+    }
+  }
   return(@array);
-}
-
-
-sub monte_carlo_chain{
-  #takes a window size and hash of distances as inputs
-  #returns a new tip that has been infected with an intein once the chain returns non-zero
-  my $window_input = shift;
-  my %hash_of_distances = %{my $hashref = shift};
-  my @invaded_targets = @_;
-  my $return_value = monte_carlo_step($window_input,\%hash_of_distances,@invaded_targets);
-  if($return_value == 0){
-    $return_value = monte_carlo_step($window_input,\%hash_of_distances,@invaded_targets);
-  }
-  else{
-    return($return_value);
-  }
 }
 
 sub get_distances_from_tip{
   #takes a nested hash of distances and key1
   #the hash is formatted as key1->key2->value
+  #can also take an array of values to skip if requested
   #returns a hash of key2's with the associated distance to key1
   my $key1 = shift;
   my %distance_hash = %{my $hashref = shift};
   my %return_hash;
+  my @values_to_skip = @_ || ();
   foreach my $key (keys %distance_hash){
     foreach my $key2 (keys %{$distance_hash{$key1}}){
       next if($key2 eq $key);
+      if(grep(/^$key2$/,@values_to_skip)){
+        next;
+      }
       $return_hash{$key2}=$distance_hash{$key1}->{$key2};
     }
   }
@@ -375,11 +403,27 @@ sub pairwise_patristic_distance{
   my %distances;
   foreach my $tip (@array_of_tips){
     foreach my $tip_to_compare (@array_of_tips){
-      my $node_distance = get_patristic_distance($tip,$tip_to_compare);
+      my $node_distance = get_patristic_distance($tip,$tip_to_compare,$tree_object);
       $distances{$tip}{$tip_to_compare}=$node_distance;
     }
   }
   return(%distances);
+}
+
+sub monte_carlo_chain{
+  #takes a window size and hash of distances as inputs
+  #returns a new tip that has been infected with an intein once the chain returns non-zero
+  my $window_input = shift;
+  my %hash_of_distances = %{my $hashref = shift};
+  my @uninvaded_targets = @_;
+  my $return_value = monte_carlo_step($window_input,\%hash_of_distances,@uninvaded_targets);
+  if($return_value eq 0){
+    print "Step rejected. Proposing new one.\n\n";
+    $return_value = monte_carlo_step($window_input,\%hash_of_distances,@uninvaded_targets);
+  }
+  else{
+    return($return_value);
+  }
 }
 
 sub monte_carlo_step{
@@ -388,22 +432,17 @@ sub monte_carlo_step{
   #returns the new location
   my $window_width = shift;
   my %distance_of_tips = %{my $hashref = shift};
-  my @invaded_exteins = @_;
-  my $current_position = 0;
+  my @uninvaded_exteins = @_;
 
   #uniform random deviant
   my $uniform_random = rand();
 
   #creates a integer value based on the window size then gets new position proposal
-  my $new_position = $current_position + int($uniform_random*$window_width);
+  my $new_position = int($uniform_random*$window_width);
 
   my $counter = 0;
-  foreach my $key (sort {$distance_of_tips{$a} <=> distance_of_tips{$b}} keys %distance_of_tips){
+  foreach my $key (sort {$distance_of_tips{$a} <=> $distance_of_tips{$b}} keys %distance_of_tips){
     if($counter == $new_position){
-      #first, check if the target has been invaded. If so, return 0
-      if ( grep( /^$key$/, @invaded_exteins) ) {
-        return(0);
-      }
       #accept of reject the move based on an exponential distribution
       #using the distance from the old tip to the new tip as the X for the distribution
       my $acceptor = accept_or_deny_move($distance_of_tips{$key});
