@@ -8,6 +8,12 @@ use Bio::AlignIO;
 use Bio::Tree::TreeFunctionsI;
 
 #USAGE: perl evolver_pipeline.pl "path or call for paml-evolver"
+#note to future self, add functionality to use this in EITHER interactive mode (as it is now),
+#OR in a predifined manner(pass arguments ahead of time)
+#further notes: interactive mode will continue even if incorrect inputs are given
+#also give code a once over for any potential code reductions. There is likely some redundancy
+#also check working code for bad fixes (especially in the MC chain)
+
 
 #GLOBALS
 my $evolver_call = $ARGV[0];
@@ -256,8 +262,10 @@ sub invade_exteins{
   my %trees_with_invasion_data;
   foreach my $extein_tree (keys %tree_samples){
     print "\n\nReading in trees to memory for paired sample $extein_tree and $tree_samples{$extein_tree}.\n\n";
-    my($extein_tree_object,@extein_tips)=readin_newick($extein_tree);
-    my($intein_tree_object,@intein_tips)=readin_newick($tree_samples{$extein_tree});
+    my($extein_tree_object,$array_ref)=readin_newick($extein_tree);
+    my @extein_tips = @{$array_ref};
+    my($intein_tree_object,$array_ref2)=readin_newick($tree_samples{$extein_tree});
+    my @intein_tips = @{$array_ref2};
 
     #get pairwise distance between all nodes in intein and extein tree
     print "Calculating pairwise patristic distance between tips.\n\n";
@@ -267,34 +275,34 @@ sub invade_exteins{
     #select a random intein and random extein to invade w/ said intein
     #then remove them from the list of valid invaders/invasion sites
     print "Preparing starting point for invasion.\n\n";
-    my $intein_tip = @intein_tips[rand($#intein_tips)];
-    @intein_tips = remove_array_element($intein_tip,@intein_tips);
-    my $extein_tip = @extein_tips[rand($#extein_tips)];
-    @extein_tips = remove_array_element($extein_tip,@extein_tips);
+    my $intein_tip = splice(@intein_tips, rand @intein_tips, 1);
+    my $extein_tip = splice(@extein_tips, rand @extein_tips, 1);
     my %paired_sequence_archive;
     $paired_sequence_archive{$extein_tip}=$intein_tip;
 
     #take the random intein/extein pair as the starting point and begin the MC chain
     #effectively treats each infected tip as a seperate chain until all inteins have infected an extein
     print "Starting Monte-Carlo chain based invasion simulation.\n\n";
-    my @invaded_exteins;
+    my (@invaded_exteins,@invaded_inteins,%paired_sequences);
     until(!@intein_tips){
-      my %paired_sequences = %paired_sequence_archive;
+      %paired_sequences = %paired_sequence_archive;
       foreach my $infected (keys %paired_sequences){
         #stop infecting if all inteins have infected
         next if(!@intein_tips);
         #get next intein tip to invade with
-        my $closest_intein = get_smallest_distance($paired_sequences{$infected},\%intein_pairwise_distances);
+        my $closest_intein = get_smallest_distance($paired_sequences{$infected},\%intein_pairwise_distances,\@invaded_inteins);
         #gets all distances from current tip excluding those previously searched
         my %distance_from_current_extein = get_distances_from_tip($infected,\%extein_pairwise_distances,@invaded_exteins);
         #returns accepted move/infection step
         $extein_tip = monte_carlo_chain($window,\%distance_from_current_extein,@extein_tips);
-        print "Step accepted. New extein invaded. Starting next step of chain shortly\m";
         #removes the intein that just invaded from list of inteins that need to infect a tip
         @intein_tips = remove_array_element($closest_intein,@intein_tips);
         #removes the just invaded extein as a valid move
         @extein_tips = remove_array_element($extein_tip,@extein_tips);
+
         push(@invaded_exteins,$extein_tip);
+        push(@invaded_inteins,$closest_intein);
+
         $paired_sequence_archive{$extein_tip}=$intein_tip;
       }
     }
@@ -317,15 +325,19 @@ sub remove_array_element{
   my $value_to_remove = shift;
   my @array = @_;
   my $index = 0;
-  foreach my $entry (@array){
-    if("$entry" eq "$value_to_remove"){
-      splice(@array, $index, 1);
-      last;
+  my $toggle =0;
+  foreach my $value (@array){
+    if($array[$index] eq $value_to_remove){
+      splice(@array,$index,1);
+      $toggle = 1;
     }
     else{
       $index++;
-      next;
     }
+  }
+  if($toggle == 0){
+    die "Could not find $value_to_remove\n
+    Expecting value akin to \'Bio::Tree::Node=HASH(0x17f7f20)\n";
   }
   return(@array);
 }
@@ -338,40 +350,42 @@ sub get_distances_from_tip{
   my $key1 = shift;
   my %distance_hash = %{my $hashref = shift};
   my %return_hash;
-  my @values_to_skip = @_ || ();
+  my @keys_to_skip = @_ || ();
   foreach my $key (keys %distance_hash){
     foreach my $key2 (keys %{$distance_hash{$key1}}){
       next if($key2 eq $key);
-      if(grep(/^$key2$/,@values_to_skip)){
-        next;
-      }
+      next if (grep { $_ eq $key2 } @keys_to_skip);
       $return_hash{$key2}=$distance_hash{$key1}->{$key2};
     }
   }
   return(%return_hash);
 }
 
-sub get_smallest_distance{
+sub get_smallest_distance {
   #takes a nested hash of distances and key1
   #the hash is formatted as key1->key2->value
+  #can also take an array of values to ignore
   #returns the key2 with the smallest distance to key1
-  my $key1 = shift;
-  my %distance_hash = %{my $hashref = shift};
-  my $key_holder;
-  foreach my $key (keys %distance_hash){
-    next if($key ne $key1);
-    my $smallest = "toggle";
-    foreach my $key2 (keys %{$distance_hash{$key1}}){
-      if(!$smallest eq "toggle"){
-        if($smallest < $distance_hash{$key1}->{$key2}){
-          next;
+    my $key_to_find = shift;
+    my %distance_hash = %{ shift() };
+    my @keys_to_skip = @{ shift() };
+    my $key_holder;
+    my $smallest;
+
+    foreach my $key1 (keys %distance_hash) {
+        next if ($key1 ne $key_to_find);
+
+        foreach my $key2 (keys %{ $distance_hash{$key1} }) {
+            next if ($key2 eq $key_to_find);
+            next if (grep { $_ eq $key2 } @keys_to_skip);
+
+            if (!defined $smallest || $distance_hash{$key1}{$key2} < $smallest) {
+                $smallest = $distance_hash{$key1}{$key2};
+                $key_holder = $key2;
+            }
         }
-      }
-      $smallest = $distance_hash{$key1}->{$key2};
-      $key_holder = $key2;
     }
-  }
-  return($key_holder);
+    return $key_holder;
 }
 
 sub readin_newick{
@@ -382,7 +396,7 @@ sub readin_newick{
                             -format => "newick");
   my $tree_object = $tree_input->next_tree;
   my @tree_taxa = $tree_object->get_leaf_nodes;
-  return($tree_object,@tree_taxa);
+  return($tree_object,\@tree_taxa);
 }
 
 sub get_patristic_distance{
@@ -417,13 +431,14 @@ sub monte_carlo_chain{
   my %hash_of_distances = %{my $hashref = shift};
   my @uninvaded_targets = @_;
   my $return_value = monte_carlo_step($window_input,\%hash_of_distances,@uninvaded_targets);
-  if($return_value eq 0){
+  if($return_value eq "0"){
     print "Step rejected. Proposing new one.\n\n";
-    $return_value = monte_carlo_step($window_input,\%hash_of_distances,@uninvaded_targets);
+    $return_value = monte_carlo_chain($window_input,\%hash_of_distances,@uninvaded_targets);
   }
   else{
     return($return_value);
   }
+  return($return_value);
 }
 
 sub monte_carlo_step{
@@ -451,7 +466,7 @@ sub monte_carlo_step{
       }
       else{
         #return 0 if move not accepted
-        return(0);
+        return("0");
       }
     }
     else{
