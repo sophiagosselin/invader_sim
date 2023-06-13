@@ -632,10 +632,10 @@ sub insert_sequences{
   my %extein_files = %{my $hashref2 = shift};
   my %intein_files = %{my $hashref3 = shift};
   mkdir("invaded_sequences");
+  print "Now inserting intein sequences into extein sequences.\n\n";
 
   #foreach extein tree file insert intein sequences into extein sequences in accordance with the invasion
   foreach my $invaded_extein_tree (keys %invasion_data){
-    print "Invaded tree file: $invaded_extein_tree\n\n";
     #select a random position to insert the intein into within the extein.
     #in order to be approximately similar to real life invasions, the invasion site
     #is placed within the 2nd or 3rd quartile of the sequence length
@@ -647,7 +647,7 @@ sub insert_sequences{
     my $paired_intein_tree_file = $invasion_data{$invaded_extein_tree}{"intein_tree"};
     my $extein_sequence_file = $extein_files{$invaded_extein_tree};
     my $intein_sequence_file = $intein_files{$paired_intein_tree_file};
-    print "Paired information: $invaded_extein_tree\t$paired_intein_tree_file\t$extein_sequence_file\t$intein_sequence_file\n\n";
+    #print "Paired information: $invaded_extein_tree\t$paired_intein_tree_file\t$extein_sequence_file\t$intein_sequence_file\n\n";
 
     #readin fasta files to memory
     my %extein_sequences = readin_fasta($extein_sequence_file);
@@ -655,7 +655,7 @@ sub insert_sequences{
 
     #foreach extein sequence tip associated with the tree, insert the associated intein sequence
     foreach my $invaded_extein_tip (keys %{$invasion_data{$invaded_extein_tree}{"tips"}}){
-      print "Invaded tip to invade $invaded_extein_tip\n";
+      #print "Tip to invade $invaded_extein_tip\n";
       #variable name makes sense shortly
       my $extein_left_sequence = $extein_sequences{$invaded_extein_tip};
       my $extein_right_sequence = substr $extein_left_sequence, 0, $insertion_position, '';
