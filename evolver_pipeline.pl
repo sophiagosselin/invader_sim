@@ -5,7 +5,10 @@ use File::Copy;
 use Getopt::Long;
 use Bio::TreeIO;
 use Bio::AlignIO;
+use Bio::Tree::Node;
 use Bio::Tree::TreeFunctionsI;
+use Cwd;
+use Data::Dumper;
 
 #USAGE: perl evolver_pipeline.pl "path or call for paml-evolver"
 #note to future self, add functionality to use this in EITHER interactive mode (as it is now),
@@ -46,11 +49,13 @@ sub MAIN{
   my @extein_phylogenies = simulate_n_trees("extein",$number_of_samples,\%extein_inputs);
   my @intein_phylogenies = simulate_n_trees("intein",$number_of_samples,\%intein_inputs);
 
+  #important to make copy for array eating process
+  my @intein_phylogenies_for_pairing = @intein_phylogenies;
   #pair each extein tree with a random intein tree. Each pairing constitutes a sample
   my %paired_intein_extein_trees;
   foreach my $extein_tree (@extein_phylogenies){
-    my $random_index = rand(@intein_phylogenies);
-    my $random_intein_tree = splice(@intein_phylogenies,$random_index,1);
+    my $random_index = rand(@intein_phylogenies_for_pairing);
+    my $random_intein_tree = splice(@intein_phylogenies_for_pairing,$random_index,1);
     $paired_intein_extein_trees{$extein_tree}=$random_intein_tree;
   }
 
@@ -58,9 +63,10 @@ sub MAIN{
   print "\n\n*******************************************************************
   Preparing intein invasion simulation.
   What window size would you like to constrain intein invasions to?\n
-    For a simulation with n exteins, and x inteins, this window (w) should follow this formulat:
+    For a simulation with n exteins, and x inteins, this window (w) should follow this formula:
       w <= n-x\n
-  For example, in a tree with 10 tips, a window of 5 would allow the intein to invade any of the closest 5 tips to its current position.\n\n";
+  For example, in a tree with 10 tips, a window of 5 would allow the intein to invade any of the closest 5 tips to its current position.\n
+  Note that exceeding the size constraint of the above equation will lead to unconstrained invasion (as, eventually, all tips will be available for invasion)\n\n";
   my $window_size = <STDIN>;
   chomp $window_size;
 
@@ -148,7 +154,7 @@ sub parameter_testing_loop{
     Does this simulated $tree_extension tree look good to you [Y/N]?\n";
     $toggle = <STDIN>;
     chomp $toggle;
-    if(uc($toggle) eq "N"){
+    if(!uc($toggle) eq "Y"){
       %inputs = parse_and_check_inputs($input_primer);
       parameter_testing_loop($toggle,$tree_extension);
     }
@@ -277,15 +283,15 @@ sub invade_exteins{
     print "Preparing starting point for invasion.\n\n";
     my $intein_tip = splice(@intein_tips, rand @intein_tips, 1);
     my $extein_tip = splice(@extein_tips, rand @extein_tips, 1);
-    my %paired_sequence_archive;
-    $paired_sequence_archive{$extein_tip}=$intein_tip;
+    my %paired_objects;
+    $paired_objects{$extein_tip}=$intein_tip;
 
     #take the random intein/extein pair as the starting point and begin the MC chain
     #effectively treats each infected tip as a seperate chain until all inteins have infected an extein
     print "Starting Monte-Carlo chain based invasion simulation.\n\n";
-    my (@invaded_exteins,@invaded_inteins,%paired_sequences);
+    my (@invaded_exteins,@invaded_inteins,%paired_sequences,%paired_sequence_archive);
     until(!@intein_tips){
-      %paired_sequences = %paired_sequence_archive;
+      %paired_sequences = %paired_objects;
       foreach my $infected (keys %paired_sequences){
         #stop infecting if all inteins have infected
         next if(!@intein_tips);
@@ -295,6 +301,8 @@ sub invade_exteins{
         my %distance_from_current_extein = get_distances_from_tip($infected,\%extein_pairwise_distances,@invaded_exteins);
         #returns accepted move/infection step
         $extein_tip = monte_carlo_chain($window,\%distance_from_current_extein,@extein_tips);
+        #print "Step accepted.\n
+        #Invaded $extein_tip with $closest_intein\n\n";
         #removes the intein that just invaded from list of inteins that need to infect a tip
         @intein_tips = remove_array_element($closest_intein,@intein_tips);
         #removes the just invaded extein as a valid move
@@ -303,7 +311,12 @@ sub invade_exteins{
         push(@invaded_exteins,$extein_tip);
         push(@invaded_inteins,$closest_intein);
 
-        $paired_sequence_archive{$extein_tip}=$intein_tip;
+        $paired_objects{$extein_tip}=$intein_tip;
+
+        #push ID values to hash for later recovery:
+        my $intein_tip_ID = $intein_tip->Bio::Tree::Node::id();
+        my $extein_tip_ID = $extein_tip->Bio::Tree::Node::id();
+        $paired_sequence_archive{$extein_tip_ID}=$intein_tip_ID;
       }
     }
 
@@ -327,6 +340,7 @@ sub remove_array_element{
   my $index = 0;
   my $toggle =0;
   foreach my $value (@array){
+    #print "Array includes $value\n";
     if($array[$index] eq $value_to_remove){
       splice(@array,$index,1);
       $toggle = 1;
@@ -336,8 +350,7 @@ sub remove_array_element{
     }
   }
   if($toggle == 0){
-    die "Could not find $value_to_remove\n
-    Expecting value akin to \'Bio::Tree::Node=HASH(0x17f7f20)\n";
+    die "\n\nCould not find $value_to_remove\n\n";
   }
   return(@array);
 }
@@ -392,7 +405,7 @@ sub readin_newick{
   #readin newick format tree file
   #return a tree object and an array of tips
   my $tree_file = shift;
-  my $tree_input = new Bio::TreeIO(-file => $tree_file,
+  my $tree_input = Bio::TreeIO->new(-file => $tree_file,
                             -format => "newick");
   my $tree_object = $tree_input->next_tree;
   my @tree_taxa = $tree_object->get_leaf_nodes;
@@ -432,7 +445,7 @@ sub monte_carlo_chain{
   my @uninvaded_targets = @_;
   my $return_value = monte_carlo_step($window_input,\%hash_of_distances,@uninvaded_targets);
   if($return_value eq "0"){
-    print "Step rejected. Proposing new one.\n\n";
+    #print "Step rejected. Proposing new one.\n\n";
     $return_value = monte_carlo_chain($window_input,\%hash_of_distances,@uninvaded_targets);
   }
   else{
@@ -456,7 +469,7 @@ sub monte_carlo_step{
   my $new_position = int($uniform_random*$window_width);
 
   my $counter = 0;
-  foreach my $key (sort {$distance_of_tips{$a} <=> $distance_of_tips{$b}} keys %distance_of_tips){
+  foreach my $key (sort {$a <=> $b} @uninvaded_exteins){
     if($counter == $new_position){
       #accept of reject the move based on an exponential distribution
       #using the distance from the old tip to the new tip as the X for the distribution
@@ -506,93 +519,107 @@ sub simulate_sequences_from_tree{
   my $seq_type = shift;
   my $number_of_seqs = shift;
   my @tree_files = @_;
-  my %trees;
-  foreach my $file (@tree_files){
-    my $tree_text = "";
-    open(IN, "< $file");
-    while(<IN>){
-      $tree_text .= $_;
-    }
-    close IN;
-    $trees{$file}=$tree_text;
+  my $counter = 1;
+  my $kappa = "";
+  my (%return_hash);
+  #directory prep
+  if(!-d "simulated_sequences"){
+    mkdir("simulated_sequences");
   }
+  mkdir("simulated_sequences/$seq_type");
 
   #get user parameters for sequence sim
-  print "Please provide inputs for $seq_type sequence simulation.\n
+  print "\n\n*******************************************************************\n\n
+  Please provide inputs for $seq_type sequence simulation.\n
   Number of nucleotides per sequence?\n";
   my $num_of_nucs = <STDIN>;
   chomp $num_of_nucs;
+
   print "Alpha parameter for gamma distribution?\n";
   my $alpha = <STDIN>;
   chomp $alpha;
+
   print "How many gamma categories for the gamma distribution?\n";
   my $gamma_cats = <STDIN>;
   chomp $gamma_cats;
 
-  #directory prep
-  mkdir("simulated_sequences");
-  chdir("simulated_sequences");
-  my %return_hash;
-  my $counter = 1;
-  foreach my $tree (keys %trees){
-    my $newick = $trees{$tree};
-    #set up subdirectory to store results
-    mkdir("$counter");
+  print "Which model would you like to use? Options are as follows:
+  (0:JC69, 1:K80, 2:F81, 3:F84, 4:HKY85, 5:T92, 6:TN93, 7:REV)\n";
+  my $model = <STDIN>;
+  chomp $model;
 
-    #create random seed for simulation
+  if($model eq "1" || "4"){
+    print "What kappa value would you like to use?\n";
+    $kappa = <STDIN>;
+    chomp $kappa;
+  }
+
+  #start simulating
+  foreach my $file (@tree_files){
+    #first, readin tree file
+    my $newick = "";
+    my $dir = getcwd;
+    print "$file is the current simulation target\n";
+    open(IN, "< $file") or die "$file could not be opened! Currently in $dir for WD\n";
+    while(<IN>){
+      $newick .= $_;
+    }
+    close IN;
+
+    #check if newick has ; at the end. If not, add one
+    chomp $newick;
+    if($newick!~/.*\;/){
+      $newick.=";";
+    }
+
+    #make and enter directory for simulation
+    mkdir("simulated_sequences/$seq_type/$counter");
+    chdir("simulated_sequences/$seq_type/$counter");
+
+    #create random seed for simulation. Per PAML this must be an odd #
     my $random_seed = int(rand(100000));
     if(0 == $random_seed % 2){
       $random_seed++;
     }
 
-    #create simulation file
-    #in the following formate
+    #note: Ignore the user manual for paml.
+    #It incorrectly places the model before the gamma distribution
+    #create simulation file in the following format:
     #paml_format (uses 0 as default)
     #random_seed
     #number_of_seqs number_of_nucleotides number_of_replicates
     #tree_length (use -1 as the tree has absolute branch lengths)
     #tree_in_newick_format
-    #alpha categories_for_gamma (gamma distribution)
-    #model model_location (since using 2 -> WAG, need to provide location)
+    #model # (0:JC69, 1:K80, 2:F81, 3:F84, 4:HKY85, 5:T92, 6:TN93, 7:REV)
+    #kappa/rate parameters in model
+    #alpha + categories_for_gamma (gamma distribution)
     #base frequencies table
-    open(EVO, "+> $counter/MCaa.dat");
+    open(EVO, "+> MCaa.dat");
     print EVO
-    "0\n
-    $random_seed\n
-    \n
-    $number_of_seqs $num_of_nucs 1\n
-    \n
-    -1\n
-    \n
-    $newick\;\n
-    \n
-    $alpha $gamma_cats\n
-    2 /usr/lib/paml/data/dat/wag.dat\n
-    \n
-    0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05\n
-    0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05\n
-    \n
-    A R N D C Q E G H I\n
-    L K M F P S T W Y V\n
-    \n
-    \/\/ end of file";
+    "0\n$random_seed\n\n$number_of_seqs $num_of_nucs 1\n\n-1\n\n$newick\n\n$model\n$kappa\n$alpha $gamma_cats\n0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05\n0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05\n\nA R N D C Q E G H I\nL K M F P S T W Y V\n\n\/\/ end of file";
     close EVO;
-    chdir("$counter");
-    system("paml-evolver 7");
+
+    #call evolver and simulate. OUT is mc.paml in phylip format
+    open(my $evolver_pipe, '|-', $evolver_call) or die "Could not open pipe to paml-evolver: $!\n";
+    print $evolver_pipe "7";
+    close $evolver_pipe;
 
     #now convert this file to fasta format
     #this might need correction......
     my $paml_file = "mc.paml";
-    my $in  = Bio::AlignIO->new(-file   => $paml_file , -format => 'phylip', -interleaved => 1);
-    my $out = Bio::AlignIO->new(-file   => ">$tree.fasta" , -format => 'fasta');
+    my $in  = Bio::AlignIO->new(-file   => $paml_file, -format => 'phylip', -interleaved => 1);
+    my $out = Bio::AlignIO->new(-file   => ">sample_$counter.fasta", -format => 'fasta');
     while ( my $aln = $in->next_aln() ) {
       $out->write_aln($aln);
     }
-    chdir("..");
-    $return_hash{$tree}="simulated_sequences/$counter/$tree.fasta";
+
+    #return location of sequence file
+    $return_hash{$file}="simulated_sequences/$seq_type/$counter/sample_$counter.fasta";
     $counter++;
+    chdir("..");
+    chdir("..");
+    chdir("..");
   }
-  chdir("..");
   return($num_of_nucs,%return_hash);
 }
 
@@ -604,9 +631,11 @@ sub insert_sequences{
   my %invasion_data = %{my $hashref1 = shift};
   my %extein_files = %{my $hashref2 = shift};
   my %intein_files = %{my $hashref3 = shift};
+  mkdir("invaded_sequences");
 
   #foreach extein tree file insert intein sequences into extein sequences in accordance with the invasion
   foreach my $invaded_extein_tree (keys %invasion_data){
+    print "Invaded tree file: $invaded_extein_tree\n\n";
     #select a random position to insert the intein into within the extein.
     #in order to be approximately similar to real life invasions, the invasion site
     #is placed within the 2nd or 3rd quartile of the sequence length
@@ -614,10 +643,11 @@ sub insert_sequences{
     my $random_half = int(rand(($extein_length/2)));
     my $insertion_position = $random_half+$quartile;
 
-    #get paire file information
+    #get paired file information
     my $paired_intein_tree_file = $invasion_data{$invaded_extein_tree}{"intein_tree"};
     my $extein_sequence_file = $extein_files{$invaded_extein_tree};
     my $intein_sequence_file = $intein_files{$paired_intein_tree_file};
+    print "Paired information: $invaded_extein_tree\t$paired_intein_tree_file\t$extein_sequence_file\t$intein_sequence_file\n\n";
 
     #readin fasta files to memory
     my %extein_sequences = readin_fasta($extein_sequence_file);
@@ -625,6 +655,7 @@ sub insert_sequences{
 
     #foreach extein sequence tip associated with the tree, insert the associated intein sequence
     foreach my $invaded_extein_tip (keys %{$invasion_data{$invaded_extein_tree}{"tips"}}){
+      print "Invaded tip to invade $invaded_extein_tip\n";
       #variable name makes sense shortly
       my $extein_left_sequence = $extein_sequences{$invaded_extein_tip};
       my $extein_right_sequence = substr $extein_left_sequence, 0, $insertion_position, '';
@@ -637,8 +668,8 @@ sub insert_sequences{
     }
 
     #print invaded and uninvaded extein seuqneces to file
-    mkdir("invaded_sequences");
-    open(OUT, "+> $extein_sequence_file.invaded");
+    my ($file_descriptor)=($extein_sequence_file=~/.*\/(.*?\.fasta)/);
+    open(OUT, "+> invaded_sequences/$file_descriptor.invaded");
     foreach my $accession (keys %extein_sequences){
       print OUT "\>$accession\n";
       print OUT "$extein_sequences{$accession}\n";
@@ -655,7 +686,10 @@ sub readin_fasta{
   while(<IN>){
     chomp;
     if($_=~/\>/){
-      $accession=$_;
+      #this regex may need change if paml changes.
+      #Currently this does retrieve the correct tip values
+      my ($no_carrot) = ($_=~/\>(.*?)\/.*/);
+      $accession=$no_carrot;
       $sequences{$accession}="";
     }
     else{
