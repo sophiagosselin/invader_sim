@@ -8,7 +8,6 @@ use Bio::AlignIO;
 use Bio::Tree::Node;
 use Bio::Tree::TreeFunctionsI;
 use Cwd;
-use Data::Dumper;
 
 #GLOBALS
 #naiive mode boolean: 0=naiive mode, 1=startup file inputs
