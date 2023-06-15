@@ -370,6 +370,11 @@ sub show_pdf {
 }
 
 sub invade_exteins{
+
+  #Note: this should be rewritten at some point such that the node objects are created
+  #and then ID's and distances between ID's are extracted. Such that the MC chain
+  #does not interact with the objects but just their properties.
+
   #takes a set of paired intein and extein trees as input
   #invades the extein trees with the inteins using a monte carlo chain
   #returns a nested hash for which the key is the extein tree, and has
