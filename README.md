@@ -8,8 +8,12 @@ Dependencies:
 
     perl (5.30.1)
       -BioPerl (1.7.8)
+      
     R (4.3.1)
       -ape (5.7)
+    
+    paml (4.1.6)
+ 
 
 
 This program will simulate extein and intein sequences according to user parameters.
