@@ -1,0 +1,5 @@
+-sp 50 -b 1 -d 1 -sf .1 -m .1
+-sp 10 -b 2 -d 1 -sf .5 -m 1
+-sn 10 -ws 10 -evo evolver
+-nn 100 -a .5 -cat 4 -m 7
+-nn 50 -a 1 -cat 4 -m 7
