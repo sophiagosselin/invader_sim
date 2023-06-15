@@ -7,9 +7,9 @@ Dependencies:
 
 
     perl (5.30.1)
-      BioPerl (1.7.8)
+      -BioPerl (1.7.8)
     R (4.3.1)
-      ape (5.7)
+      -ape (5.7)
 
 
 This program will simulate extein and intein sequences according to user parameters.
@@ -28,13 +28,16 @@ Else, a parameter file (is.param) can be provided using the following parameters
 
 These parameters apply to phylogeny simulations
 
+
   -sp -> number of species.
   -b -> birth rate.
   -d -> death rate.
   -sf -> sample fraction.
   -m -> mutation rate.\n
 
+
 These parameters apply to sequence simulations
+
 
   -nn -> number of nucleotides.
   -a -> alpha parameter for gamma distribution
@@ -42,11 +45,14 @@ These parameters apply to sequence simulations
   -m -> model number: (0:JC69, 1:K80, 2:F81, 3:F84, 4:HKY85, 5:T92, 6:TN93, 7:REV)
   -k -> kappa value. Only necessary if models 1 or 4 are selected.
 
+
 These parameters are general to the code
+
 
   -sn -> number of simulations to create
   -ws -> window size for MC chain (how many tips away can an intein jump)
   -evo -> string to call paml-evolver (likely paml-evolver, or evolver)
+
 
 Note that the is.param must be formated as:
 extein phylogeny simulation parameters
@@ -56,6 +62,7 @@ extein sequence simulation parameters
 intein sequence simulation parameters
 
 An example is.param file:
+
 
   -sp 50 -b 1 -d 1 -sf .1 -m .01
   -sp 10 -b 1 -d 1 -sf .1 -m .1
