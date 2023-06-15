@@ -35,7 +35,7 @@ sub STARTUP{
     die
 "\n\n\n****************************************************************************
 
-Intein Invasion Sequence Simulator v1.0.0\n
+INVADER-SIM (Intein Invasion Sequence Simulator) v1.0.0\n
 
 Author: Gosselin Sophia
 Bug reporting: https://github.com/sophiagosselin/evolver_pipeline
