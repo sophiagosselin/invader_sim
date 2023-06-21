@@ -123,11 +123,38 @@ do
   cd ..
 done
 
+#create paired parameters to run ice_blast with
+evals=("1e-2.5","1e-5","1e-7.5","1e-10","1e-12.5","1e-15","1e-17.5","1e-20")
+paired_parameters=()
+for id in $(seq .5 .55 .6 .65 .7 .75 .8 .85 .9 .95)
+do
+  for e in $evals
+  do
+    paired_parameters+="$id\&$e"
+  done
+done
+
 #run ice_blast
 for directory in $sample_directories
 do
+  directory_contents=(~/$directory/*)
   cd $directory
-  perl iceblast.pl -in "random_intein.fasta" -psidb "intein_sub.db" -outdb "extein.db" -t 16 -id 0.75 -e 1e-15 -ds .25
+  for parameters in $paired_parameters
+  do
+    mkdir $parameters
+    for file in $directory_contents
+    do
+      cp $file $paramaeters
+    done
+
+    cd $parameters
+    (id_param)=[[$parmeters =~ (.*?)\&.* ]]
+    (e_param)=[[$parmeters =~ .*?\&(.*) ]]
+
+    perl iceblast.pl -in "random_intein.fasta" -psidb "intein_sub.db" -outdb "extein.db" -t 16 -id $id_param -e $e_param -ds .25
+
+    cd ..
+  done
   cd ..
   cd ..
 done
