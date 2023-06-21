@@ -815,8 +815,9 @@ sub insert_sequences{
     }
 
     #print invaded and uninvaded extein seuqneces to file
-    my ($file_descriptor)=($extein_sequence_file=~/.*\/(.*?\.fasta)/);
-    open(OUT, "+> invaded_sequences/$file_descriptor.invaded");
+    my ($file_descriptor1)=($extein_sequence_file=~/.*\/(.*?)\.fasta/);
+    my ($file_descriptor2)=($intein_sequence_file=~/.*\/(.*?)\.fasta/);
+    open(OUT, "+> invaded_sequences/extein\_$file_descriptor1\_intein\_$file_descriptor2.fasta");
     foreach my $accession (keys %extein_sequences){
       print OUT "\>$accession\n";
       print OUT "$extein_sequences{$accession}\n";
