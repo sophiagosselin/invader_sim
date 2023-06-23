@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=ice_simulation
+#SBATCH --job-name=sim_test
 #SBATCH --nodes=1
 #SBATCH --qos=general
 #SBATCH --ntasks=1
@@ -8,8 +8,8 @@
 #SBATCH -t 100:00:00
 #SBATCH --mail-type=END
 #SBATCH --mail-user=sophia.gosselin@uconn.edu
-#SBATCH -o ice_sim_%j.out
-#SBATCH -e ice_sim_%j.err
+#SBATCH -o sim_%j.out
+#SBATCH -e sim_%j.err
 
 echo hostname
 #NOTES: Need ice_blast.pl in home directory of simulation run
@@ -18,7 +18,7 @@ echo hostname
 
 #dependencies
 module load blast
-module load perl
+module load perl/5.36.0
 module load R
 module load paml
 
@@ -29,9 +29,9 @@ export PERL5LIB=/home/FCAM/sgosselin/perl5/lib/perl5
 perl invader_sim.pl
 
 #get all simulation files from simulation
-invaded_sequences=(~/invaded_sequences/*)
-intein_sequences=(~/simulated_sequences/intein/*/*.fasta)
-extein_sequences=(~/simulated_sequences/extein/*/*.fasta)
+invaded_sequences=(invaded_sequences/*)
+intein_sequences=(simulated_sequences/intein/*/*.fasta)
+extein_sequences=(simulated_sequences/extein/*/*.fasta)
 
 #create directory for ICE BLAST and prep variables
 mkdir "ice_blast_runs"
@@ -43,24 +43,26 @@ extein_files=()
 for file in $invaded_sequences
 do
   #create subdirectory
-  mkdir $counter
+  mkdir "ice_blast_runs/$counter"
 
   #invaded_sequences/extein\_$file_descriptor1\_intein\_$file_descriptor2.fasta
-  (extein,intein)=[[$file =~ invaded_sequences/extein\_(.*?)\_intein\_(.*?)\.fasta]]
+  [[ $file =~ invaded_sequences\/extein_sample_(.*)_intein_sample_(.*)\.fasta ]]
+  extein=${BASH_REMATCH[1]}
+  intein=${BASH_REMATCH[2]}
 
   #move files to new subdirectory
   mv $file "ice_blast_runs/$counter/"
-  mv "/simulated_sequences/intein/*/$intein.fasta" "ice_blast_runs/$counter/$intein.fasta.intein"
-  mv "/simulated_sequences/extein/*/$extein.fasta" "ice_blast_runs/$counter/$extein.fasta.extein"
+  mv  "simulated_sequences/extein/$extein/*.fasta" "ice_blast_runs/$counter/"
+  mv  "simulated_sequences/intein/$intein/*.fasta" "ice_blast_runs/$counter/"
   cp "ice_blast.pl" "ice_blast_runs/$counter/"
 
   #push to array of subdirectory and inteins
   sample_directories+=("ice_blast_runs/$counter/")
-  intein_files+=("$counter/$intein.fasta.intein")
-  extein_files+=("$counter/$extein.fasta.extein")
+  intein_files+=("$counter/intein*")
+  extein_files+=("$counter/extein*")
 
   #increment up
-  $counter++
+  (($counter++))
 done
 
 #create a fasta file containing a random intein sequence from each sample
@@ -71,12 +73,13 @@ do
   declare -A paired_intein_sequneces
   intein_asc=()
   asc_holder=""
-  (file_loc)=[[$intein_file =~ (.*)\/.*?\.fasta.intein]]
+  [[ $intein_file =~ (.*)\/.*\.fasta ]]
+  file_loc=${BASH_REMATCH[1]}
 
   #read fasta file to memory
   while read -r line;
     do
-    if [[ $line=~^\> ]]
+    if [[ $line =~ ^\> ]]
     then
       intein_asc+=($line)
       asc_holder=$line
@@ -89,7 +92,7 @@ do
 
     #print random intein to file with asc
     echo $random_intein >> "$file_loc/random_intein.fasta"
-    echo $paired_intein_sequneces[$random_intein] >> "$file_loc/random_intein.fasta"
+    echo ${paired_intein_sequneces[$random_intein]} >> "$file_loc/random_intein.fasta"
 
     #now create subset of data for psidb
     #this value will need editing. Base it off the num of inteins used in dataset
@@ -98,7 +101,7 @@ do
       random_intein=${intein_asc[ $RANDOM % ${#intein_asc[@]} ]}
       #print random intein to file with asc
       echo $random_intein >> "$file_loc/intein_subset.fasta"
-      echo $paired_intein_sequneces[$random_intein] >> "$file_loc/intein_subset.fasta"
+      echo ${paired_intein_sequneces[$random_intein]} >> "$file_loc/intein_subset.fasta"
 
       #the following ensures no repeats
       delete=($random_intein)
@@ -116,7 +119,8 @@ done
 #make blast databases from all extein sequences
 for extein_file in $extein_files
 do
-  (file_loc)=[[$intein_file =~ (.*)\/.*?\.fasta.extein]]
+  [[ $extein_file =~ (.*)\/.*\.fasta ]]
+  file_loc=${BASH_REMATCH[1]}
   cd $file_loc
   makeblastdb -in $extein_file -input_type "prot" -parse_seqids -out "extein.db"
   cd ..
@@ -144,12 +148,13 @@ do
     mkdir $parameters
     for file in $directory_contents
     do
-      cp $file $paramaeters
+      cp "$file" .
     done
 
     cd $parameters
-    (id_param)=[[$parmeters =~ (.*?)\&.* ]]
-    (e_param)=[[$parmeters =~ .*?\&(.*) ]]
+    [[ $parameters =~ (.*)\&(.*) ]]
+    id_param=$(basename "${BASH_REMATCH[1]}")
+    e_param=$(basename "${BASH_REMATCH[2]}")
 
     perl iceblast.pl -in "random_intein.fasta" -psidb "intein_sub.db" -outdb "extein.db" -t 16 -id $id_param -e $e_param -ds .25
 
