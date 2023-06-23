@@ -52,8 +52,8 @@ do
 
   #move files to new subdirectory
   mv $file "ice_blast_runs/$counter/"
-  mv  "simulated_sequences/extein/$extein/*.fasta" "ice_blast_runs/$counter/"
-  mv  "simulated_sequences/intein/$intein/*.fasta" "ice_blast_runs/$counter/"
+  mv  simulated_sequences/extein/$extein/*.fasta "ice_blast_runs/$counter/"
+  mv  simulated_sequences/intein/$intein/*.fasta "ice_blast_runs/$counter/"
   cp "ice_blast.pl" "ice_blast_runs/$counter/"
 
   #push to array of subdirectory and inteins

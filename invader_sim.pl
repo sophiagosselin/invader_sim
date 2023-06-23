@@ -15,7 +15,7 @@ my $naiive_mode = 0;
 my (%extein_tree_params, %intein_tree_params, %sample_params, %extein_seq_params, %intein_seq_params);
 my %sample_getopt = ("sn"=>"sn=i","ws"=>"ws=i","evo"=>"evo=s");
 my %tree_sim_getopt = ("sp"=>"sp=i","b"=>"b=s","d"=>"d=s","sf"=>"sf=s","m"=>"m=s");
-my %sequence_sim_getopt = ("nn"=>"nn=s","a"=>"a=s","cat"=>"cat=s","m"=>"m=s","k"=>"k:s");
+my %sequence_sim_getopt = ("nn"=>"nn=s","a"=>"a=s","cat"=>"cat=s","m"=>"m=s");
 
 #Code Start
 
@@ -64,8 +64,7 @@ Else, a parameter file (is.param) can be provided using the following parameters
 -nn -> number of nucleotides.
 -a -> alpha parameter for gamma distribution
 -cat -> number of rate categories for the gamma distribution
--m -> model number: (0:JC69, 1:K80, 2:F81, 3:F84, 4:HKY85, 5:T92, 6:TN93, 7:REV)
--k -> kappa value. Only necessary if models 1 or 4 are selected.
+-m -> model number: (0: Poisson, 1: Proportional)
 
 \#These parameters are general to the code
 -sn -> number of simulations to create
@@ -83,8 +82,8 @@ An example is.param file:
 -sp 50 -b 1 -d 1 -sf .1 -m .01
 -sp 10 -b 1 -d 1 -sf .1 -m .1
 -sn 100 -ws 10 -evo evolver
--nn 100 -a .5 -cat 4 -m 7
--nn 50 -a 1 -cat 4 -m 4 -k .5\n\n";
+-nn 100 -a .5 -cat 4 -m 0
+-nn 50 -a 1 -cat 4 -m 1 \n\n";
   }
   if(-e "is.param"){
     $naiive_mode = 1;
@@ -237,11 +236,15 @@ sub parse_and_check_inputs{
     print "\n\nChecking Parameters\n\n";
     foreach my $input (keys %parsed_inputs){
       if(!defined $parsed_inputs{$input} || $parsed_inputs{$input} eq 'undef'){
-        next if($input_types{$input}=~/.*\:s/);
-        print "$input is not defined. Please define it now:\n";
-        my $new_parameter = <STDIN>;
-        chomp $new_parameter;
-        $parsed_inputs{$input}=$new_parameter;
+        if($naiive_mode == 0){
+          print "$input is not defined. Please define it now:\n";
+          my $new_parameter = <STDIN>;
+          chomp $new_parameter;
+          $parsed_inputs{$input}=$new_parameter;
+        }
+        else{
+          die "$input not defined\n";
+        }
       }
       else{}
     }
@@ -743,7 +746,7 @@ sub simulate_sequences_from_tree{
     #base frequencies table
     open(EVO, "+> MCaa.dat");
     print EVO
-    "0\n$random_seed\n\n$number_of_seqs $sequence_sim_params{'nn'} 1\n\n-1\n\n$newick\n\n$sequence_sim_params{'m'}\n$sequence_sim_params{'k'}\n$sequence_sim_params{'a'} $sequence_sim_params{'cats'}\n0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05\n0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05\n\nA R N D C Q E G H I\nL K M F P S T W Y V\n\n\/\/ end of file";
+    "0\n$random_seed\n$number_of_seqs $sequence_sim_params{'nn'} 1\n-1\n$newick\n\n$sequence_sim_params{'a'} $sequence_sim_params{'cat'}\n$sequence_sim_params{'m'}\n0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05\n0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05\n\nA R N D C Q E G H I\nL K M F P S T W Y V\n\n\/\/ end of file";
     close EVO;
 
     #call evolver and simulate. OUT is mc.paml in phylip format
