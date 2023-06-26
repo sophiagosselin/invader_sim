@@ -30,8 +30,6 @@ perl invader_sim.pl
 
 #get all simulation files from simulation
 invaded_sequences=(invaded_sequences/*)
-intein_sequences=(simulated_sequences/intein/*/*.fasta)
-extein_sequences=(simulated_sequences/extein/*/*.fasta)
 
 #create directory for ICE BLAST and prep variables
 mkdir "ice_blast_runs"
@@ -52,17 +50,17 @@ do
 
   #move files to new subdirectory
   mv $file "ice_blast_runs/$counter/"
-  mv  simulated_sequences/extein/$extein/*.fasta "ice_blast_runs/$counter/"
-  mv  simulated_sequences/intein/$intein/*.fasta "ice_blast_runs/$counter/"
-  cp "ice_blast.pl" "ice_blast_runs/$counter/"
+  mv  simulated_sequences/extein/$extein/*.fasta "ice_blast_runs/$counter/extein_sample_$extein.fasta"
+  mv  simulated_sequences/intein/$intein/*.fasta "ice_blast_runs/$counter/intein_sample_$intein.fasta"
+  cp ice_blast.pl "ice_blast_runs/$counter/"
 
   #push to array of subdirectory and inteins
   sample_directories+=("ice_blast_runs/$counter/")
-  intein_files+=("$counter/intein*")
-  extein_files+=("$counter/extein*")
+  intein_files+=("$counter/intein_sample_$intein.fasta")
+  extein_files+=("$counter/extein_sample_$extein.fasta")
 
   #increment up
-  (($counter++))
+  $counter++
 done
 
 #create a fasta file containing a random intein sequence from each sample
@@ -148,7 +146,7 @@ do
     mkdir $parameters
     for file in $directory_contents
     do
-      cp "$file" .
+      cp $file .
     done
 
     cd $parameters

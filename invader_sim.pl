@@ -121,6 +121,8 @@ An example is.param file:
 }
 
 sub MAIN{
+  #Why is this necessary? I'm not sure. TLDR if this isn't here, the program works fine in an interactive session, but hangs if submitted via a batch script
+  local $| = 1;
   #get user inputs and test until they are satisfied
   if($naiive_mode == 0){
     %extein_tree_params = test_parameters("extein");
