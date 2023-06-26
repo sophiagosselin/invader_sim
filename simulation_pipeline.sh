@@ -3,8 +3,8 @@
 #SBATCH --nodes=1
 #SBATCH --qos=general
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=32gb
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=16gb
 #SBATCH -t 100:00:00
 #SBATCH --mail-type=END
 #SBATCH --mail-user=sophia.gosselin@uconn.edu
@@ -52,15 +52,15 @@ do
   mv $file "ice_blast_runs/$counter/"
   mv  simulated_sequences/extein/$extein/*.fasta "ice_blast_runs/$counter/extein_sample_$extein.fasta"
   mv  simulated_sequences/intein/$intein/*.fasta "ice_blast_runs/$counter/intein_sample_$intein.fasta"
-  cp ice_blast.pl "ice_blast_runs/$counter/"
+  cp iceblast.pl "ice_blast_runs/$counter/"
 
   #push to array of subdirectory and inteins
   sample_directories+=("ice_blast_runs/$counter/")
-  intein_files+=("$counter/intein_sample_$intein.fasta")
-  extein_files+=("$counter/extein_sample_$extein.fasta")
+  intein_files+=("ice_blast_runs/$counter/intein_sample_$intein.fasta")
+  extein_files+=("ice_blast_runs/$counter/extein_sample_$extein.fasta")
 
   #increment up
-  $counter++
+  ((counter+=1))
 done
 
 #create a fasta file containing a random intein sequence from each sample
@@ -73,17 +73,18 @@ do
   asc_holder=""
   [[ $intein_file =~ (.*)\/.*\.fasta ]]
   file_loc=${BASH_REMATCH[1]}
-
+  sed -i -e 's/\///g' $intein_file
   #read fasta file to memory
   while read -r line;
     do
-    if [[ $line =~ ^\> ]]
-    then
-      intein_asc+=($line)
-      asc_holder=$line
-    else
-      paired_intein_sequneces[$asc_holder]+=$line
-    fi
+      if [[ $line =~ ^\> ]]
+      then
+        intein_asc+=($line)
+        asc_holder=$line
+        paired_intein_sequences[$asc_holder]=""  # Use quotes around the index
+      else
+        paired_intein_sequences[$asc_holder]="${paired_intein_sequences["$asc_holder"]}$line"  # Use quotes around the index
+      fi
 
     #select random intein
     random_intein=${intein_asc[ $RANDOM % ${#intein_asc[@]} ]}
@@ -109,7 +110,7 @@ do
 
   #finally, make blast db
   cd $file_loc
-  makeblastdb -in $intein_file -input_type "prot" -parse_seqids -out "intein_sub.db"
+  makeblastdb -in $intein_file -dbtype "prot" -parse_seqids -out "intein_sub.db"
   cd ..
   cd ..
 done
@@ -120,7 +121,7 @@ do
   [[ $extein_file =~ (.*)\/.*\.fasta ]]
   file_loc=${BASH_REMATCH[1]}
   cd $file_loc
-  makeblastdb -in $extein_file -input_type "prot" -parse_seqids -out "extein.db"
+  makeblastdb -in $extein_file -dbtype "prot" -parse_seqids -out "extein.db"
   cd ..
   cd ..
 done
