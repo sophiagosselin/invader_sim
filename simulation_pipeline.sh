@@ -3,9 +3,8 @@
 #SBATCH --nodes=1
 #SBATCH --qos=general
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=16gb
-#SBATCH -t 100:00:00
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=64gb
 #SBATCH --mail-type=END
 #SBATCH --mail-user=sophia.gosselin@uconn.edu
 #SBATCH -o sim_%j.out
@@ -82,7 +81,7 @@ do
     line=$(echo $line)
     if [[ $line =~ ^\> ]]
     then
-      ${asc_holder}="${line}_${count_2}"
+      asc_holder="${line}_${count_2}"
       paired_intein_sequences[${asc_holder}]=""  # Use quotes around the index
       intein_asc+=(${asc_holder})
       count_2=$((count_2 + 1))
@@ -103,7 +102,7 @@ do
   echo "${random_intein}" >> "$file_loc/random_intein.fasta"
   echo "Random asc: ${random_intein}"
   echo "Random seq:"
-  rnd_seq=${paired_intein_sequneces[${random_intein}]}
+  rnd_seq=${paired_intein_sequences["${random_intein}"]}
   echo "${rnd_seq}" >> "$file_loc/random_intein.fasta"
   echo "${rnd_seq}"
 
@@ -113,16 +112,16 @@ do
   rand_size=$((size_of_arr / 10))
   for rand in {0..$rand_size}
     do
-      random_index=${intein_asc[ $RANDOM % ${#intein_asc[@]} ]}
-      random_intein=$intein_asc[$random_index]
+      random_index=$[$RANDOM % ${#intein_asc[@]}]
+      random_intein=${intein_asc[$random_index]}
       #print random intein to file with asc
-      echo "${random_intein}" >> "${file_loc}/intein_subset.fasta"
+      echo "${random_intein}" >> "$file_loc/intein_subset.fasta"
       echo "Acession: ${random_intein}"
-      seq_from_array=${paired_intein_sequences[$random_intein]}
-      echo "${seq_from_array}" >> "${file_loc}/intein_subset.fasta"
+      seq_from_array=${paired_intein_sequences["${random_intein}"]}
+      echo "${seq_from_array}" >> "$file_loc/intein_subset.fasta"
       echo "Sequence: ${seq_from_array}"
       #the following ensures no repeats
-      delete=($random_intein)
+      delete=($random_index)
       asc_holder=( "${asc_holder[@]/$delete}")
     done
 
@@ -198,7 +197,7 @@ for directory in ${sample_directories[@]}
           done
 
         cd $paramdir3
-        perl iceblast.pl -in random_intein.fasta -psidb intein_subset.fasta -outdb all_exteins.fasta -t 8 -id $id_param -e $e_param -ds .25 -v 2
+        perl iceblast.pl -in random_intein.fasta -psidb intein_subset.fasta -outdb all_exteins.fasta -t 32 -id $id_param -e $e_param -ds .25 -v 2
         wait
         cd -
 
