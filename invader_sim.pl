@@ -9,9 +9,10 @@ use Bio::Tree::Node;
 use Bio::Tree::TreeFunctionsI;
 use Cwd;
 
+$| = 1;
 #future coding notes:
 #might be worth adding a scratch file to solve the hanging issue
-#should rewrite 
+#should rewrite
 
 #GLOBALS
 #naiive mode boolean: 0=naiive mode, 1=startup file inputs
@@ -126,7 +127,6 @@ An example is.param file:
 
 sub MAIN{
   #Why is this necessary? I'm not sure. TLDR if this isn't here, the program works fine in an interactive session, but hangs if submitted via a batch script
-  local $| = 1;
   #get user inputs and test until they are satisfied
   if($naiive_mode == 0){
     %extein_tree_params = test_parameters("extein");

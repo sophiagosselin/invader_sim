@@ -109,7 +109,7 @@ do
   #now create subset of data for psidb
   #this value will need editing. Base it off the num of inteins used in dataset
   size_of_arr=${#intein_asc[@]}
-  rand_size=$((size_of_arr / 10))
+  rand_size=(($size_of_arr/10))
   for rand in {0..$rand_size}
     do
       random_index=$[$RANDOM % ${#intein_asc[@]}]
