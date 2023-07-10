@@ -8,6 +8,10 @@ use Bio::AlignIO;
 use Bio::Tree::Node;
 use Bio::Tree::TreeFunctionsI;
 use Cwd;
+use threads;
+use threads::shared;
+use Data::Dumper;
+
 
 $| = 1;
 #future coding notes:
@@ -400,19 +404,42 @@ sub invade_exteins{
     my @intein_tip_objects = @{$array_ref2};
 
     #get pairwise distance between all nodes in intein and extein tree
-    #importantly this hash is structured %hash{$object_string}{\$object_string2}=distance_value
+    #importantly this hash is structured %hash{"nodeID"}{"nodeID"}=distance_value
     print "Calculating pairwise patristic distance between tips.\n\n";
-    my %extein_pairwise_distances = pairwise_patristic_distance($extein_tree_object,@extein_tip_objects);
-    my %intein_pairwise_distances = pairwise_patristic_distance($intein_tree_object,@intein_tip_objects);
+    my ($array_of_hashes_ref)=pairwise_distance_high($extein_tree_object,@extein_tip_objects);
+    my @array_of_hashes = @{$array_of_hashes_ref};
+    my (%extein_pairwise_distances) = MERGE_NESTED_HASHES(@array_of_hashes);
+
+    my ($array_of_hashes_ref2)=pairwise_distance_high($intein_tree_object,@intein_tip_objects);
+    my @array_of_hashes2 = @{$array_of_hashes_ref2};
+    my (%intein_pairwise_distances) = MERGE_NESTED_HASHES(@array_of_hashes2);
+
+    #clear memory
+    $array_of_hashes_ref="";
+    $array_of_hashes_ref2="";
+    @array_of_hashes=();
+    @array_of_hashes2=();
+
+    #gets arrays of tip ids for inteins and exteins
+    my @intein_tip_ids;
+    foreach my $node_obj (@intein_tip_objects){
+      my $id_of_node = get_id($node_obj,@intein_tip_objects);
+      push(@intein_tip_ids,$id_of_node);
+    }
+    my @extein_tip_ids;
+    foreach my $node_obj (@extein_tip_objects){
+      my $id_of_node = get_id($node_obj,@extein_tip_objects);
+      push(@extein_tip_ids,$id_of_node);
+    }
 
     #select a random intein and random extein to invade w/ said intein
     #then remove them from the list of valid invaders/invasion sites
     #then save pairing of object refs
     print "Preparing starting point for invasion.\n\n";
     my (@invaded_exteins,@invaded_inteins,%paired_sequence_archive);
-    my $intein_tip = splice(@intein_tip_objects, rand @intein_tip_objects, 1);
-    my $extein_tip = splice(@extein_tip_objects, rand @extein_tip_objects, 1);
-    my %paired_extein_intein_object_refs = ($extein_tip => $intein_tip);
+    my $intein_tip = splice(@intein_tip_ids, rand @intein_tip_ids, 1);
+    my $extein_tip = splice(@extein_tip_ids, rand @extein_tip_ids, 1);
+    my %paired_extein_intein_tip_ids = ($extein_tip => $intein_tip);
     push(@invaded_exteins,$extein_tip);
     push(@invaded_inteins,$intein_tip);
     #print "First pair is Extein: $extein_tip Intein: $intein_tip\n";
@@ -420,41 +447,39 @@ sub invade_exteins{
     #take the random intein/extein pair as the starting point and begin the MC chain
     #effectively treats each infected tip as a seperate chain until all inteins have infected an extein
     print "Starting Monte-Carlo chain based invasion simulation.\n\n";
-    until(!@intein_tip_objects){
-      my %itterating_paired_object_refs = %paired_extein_intein_object_refs;
-      foreach my $extein_object_ref (keys %itterating_paired_object_refs){
-        #print "Extein to invade from: $extein_object_ref\n";
+    until(!@intein_tip_ids){
+      my %itterating_paired_tips = %paired_extein_intein_tip_ids;
+      foreach my $extein_tip_for_work (keys %itterating_paired_tips){
+        #print "Extein to invade from: $extein_tip_for_work\n";
         #stop infecting if all inteins have infected
-        next if(!@intein_tip_objects);
+        next if(!@intein_tip_ids);
 
         #get next intein tip to invade with.
         #inputs ref to intein that invaded current extein of foreach loop.
-        my $closest_intein_node = get_smallest_distance($itterating_paired_object_refs{$extein_object_ref},\%intein_pairwise_distances,@invaded_inteins);
-        #print "Closest intein: $closest_intein_node\n";
+        my $new_intein_id = get_smallest_distance($itterating_paired_tips{$extein_tip_for_work},\%intein_pairwise_distances,@invaded_inteins);
+        #print "Closest intein: $new_intein_id\n";
 
         #gets all distances from current tip excluding those previously searched
-        my %distance_from_current_extein = get_distances_from_tip($extein_object_ref,\%extein_pairwise_distances,@invaded_exteins);
+        my %distance_from_current_extein = get_distances_from_tip($extein_tip_for_work,\%extein_pairwise_distances,@invaded_exteins);
 
         #returns accepted move/infection step
-        my $new_extein_object = monte_carlo_chain($window,\%distance_from_current_extein);
+        my $new_extein_id= monte_carlo_chain($window,\%distance_from_current_extein);
         #print "Extein to invade into $new_extein_object\n";
         #defref object
 
         #retrieve original object, and use it to get ID's for downstream use
-        my $extein_tip_ID = get_id($new_extein_object,@extein_tip_objects)or die;
-        my $intein_tip_ID = get_id($closest_intein_node,@intein_tip_objects) or die;
-        #print "$extein_tip_ID\t$intein_tip_ID\n";
-        $paired_sequence_archive{$extein_tip_ID}=$intein_tip_ID;
+        #print "$new_extein_id\t$new_intein_id\n";
+        $paired_sequence_archive{$new_extein_id}=$new_intein_id;
 
         #removes the intein that just invaded from list of inteins that need to infect a tip
-        @intein_tip_objects = remove_array_element($closest_intein_node,@intein_tip_objects);
+        @intein_tip_ids = remove_array_element($new_intein_id,@intein_tip_ids);
         #removes the just invaded extein as a valid move
-        @extein_tip_objects = remove_array_element($new_extein_object,@extein_tip_objects);
+        @extein_tip_ids = remove_array_element($new_extein_id,@extein_tip_ids);
 
-        push(@invaded_exteins,$new_extein_object);
-        push(@invaded_inteins,$closest_intein_node);
+        push(@invaded_exteins,$new_extein_id);
+        push(@invaded_inteins,$new_intein_id);
 
-        $paired_extein_intein_object_refs{$new_extein_object}=$closest_intein_node;
+        $paired_extein_intein_tip_ids{$new_extein_id}=$new_intein_id;
       }
     }
 
@@ -470,9 +495,20 @@ sub invade_exteins{
   return(%trees_with_invasion_data);
 }
 
+sub MERGE_NESTED_HASHES{
+	my @hashes_to_merge = @_;
+	my %new_hash;
+	foreach my $hashref (@hashes_to_merge){
+		my %temp_hash = %{$hashref};
+		%new_hash = (%new_hash,%temp_hash);
+	}
+	my $test = (\%new_hash);
+	return(%new_hash);
+}
+
 sub get_id{
-  #takes object array and ref to object
-  #returns unstringified object
+  #takes object array and ref to node object
+  #returns tip id of node object
   my $obj_ref = shift;
   my @obj_array = @_;
   my $index = 0;
@@ -547,16 +583,15 @@ sub get_smallest_distance {
     my $key_holder;
     my $smallest;
     foreach my $key1 (keys %distance_hash) {
+      #print "Key1 $key1\n";
         next if ($key1 ne $key_to_find);
-        #print "Key1 $key1\n";
 
         foreach my $key2 (keys %{ $distance_hash{$key1} }) {
+          #print "Key2 $key2\n";
             next if ($key2 eq $key_to_find);
-            #print "Key2 $key2\n";
             my $toggle = 0;
             foreach my $test (@keys_to_skip){
               if($test eq $key2){
-                #print "Skipping $key2 like a good girl\n";
                 $toggle = 1;
               }
             }
@@ -592,19 +627,39 @@ sub get_patristic_distance{
   return($distance);
 }
 
-sub pairwise_patristic_distance{
+sub pairwise_distance_high{
   #takes an array of tree tip nodes, and a tree object as inputs
   #returns a nested hash of object reference keys paired to their distance from the node of interest
   my $tree_object = shift;
   my @array_of_tips = @_;
-  my %distances;
+  my (@threads,@return_values);
+  my $subroutine="pairwise_distance_low";
   foreach my $tip (@array_of_tips){
-    foreach my $tip_to_compare (@array_of_tips){
-      my $node_distance = get_patristic_distance($tip,$tip_to_compare,$tree_object);
-      $distances{$tip}{$tip_to_compare}=$node_distance;
-    }
+    my($thread)=threads->create(\&$subroutine,$tree_object,$tip,@array_of_tips);
+    push(@threads,$thread);
   }
-  return(%distances);
+  foreach (@threads){
+    my $return_value = $_->join();
+    push(@return_values,$return_value);
+  }
+  #print "Finished pairwise sub\n";
+  return(\@return_values);
+}
+
+sub pairwise_distance_low{
+  #takes an array of tree tip nodes, and a tree object as inputs
+  #returns a nested hash of object reference keys paired to their distance from the node of interest
+  my $tree_object = shift;
+  my $tip = shift;
+  my %distances;
+  my @array_of_tips = @_;
+  foreach my $tip_to_compare (@array_of_tips){
+    my $node_distance = get_patristic_distance($tip,$tip_to_compare,$tree_object);
+    my $tipid1=get_id($tip,@array_of_tips);
+    my $tipid2=get_id($tip_to_compare,@array_of_tips);
+    $distances{$tipid1}{$tipid2}=$node_distance;
+  }
+  return(\%distances);
 }
 
 sub monte_carlo_chain{

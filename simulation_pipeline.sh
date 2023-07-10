@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=sim_test
+#SBATCH --job-name=ice_blast_fpfn
 #SBATCH --nodes=1
 #SBATCH --qos=general
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=64
 #SBATCH --mem=64gb
 #SBATCH --mail-type=END
 #SBATCH --mail-user=sophia.gosselin@uconn.edu
@@ -20,6 +20,7 @@ module load blast
 module load perl/5.36.0
 module load R
 module load paml
+module load usearch
 
 #add libraries to path
 export PERL5LIB=/home/FCAM/sgosselin/perl5/lib/perl5
@@ -35,7 +36,7 @@ mkdir "ice_blast_runs"
 counter=0
 sample_directories=()
 intein_files=()
-extein_files=()
+simulated_sequence_files=()
 
 for file in ${invaded_sequences[@]}
 do
@@ -47,6 +48,9 @@ do
   extein=${BASH_REMATCH[1]}
   intein=${BASH_REMATCH[2]}
 
+  [[ $file =~ invaded_sequences\/(extein_sample_.*_intein_sample_.*\.fasta) ]]
+  file_name=${BASH_REMATCH[1]}
+
   #move files to new subdirectory
   mv $file "ice_blast_runs/$counter/"
   mv  simulated_sequences/extein/$extein/*.fasta "ice_blast_runs/$counter/extein_sample_$extein.fasta"
@@ -56,7 +60,7 @@ do
   #push to array of subdirectory and inteins
   sample_directories+=("ice_blast_runs/$counter")
   intein_files+=("ice_blast_runs/$counter/intein_sample_$intein.fasta")
-  extein_files+=("ice_blast_runs/$counter/extein_sample_$extein.fasta")
+  simulated_sequence_files+=("ice_blast_runs/$counter/$file_name")
 
   #increment up
   ((counter+=1))
@@ -85,7 +89,7 @@ do
       paired_intein_sequences[${asc_holder}]=""  # Use quotes around the index
       intein_asc+=(${asc_holder})
       count_2=$((count_2 + 1))
-      echo "Valid ASC ID: ${asc_holder}"
+      #echo "Valid ASC ID: ${asc_holder}"
     else
       subseq=${paired_intein_sequences[${asc_holder}]}
       seq="${subseq}${line}"
@@ -100,26 +104,27 @@ do
 
   #print random intein to file with asc
   echo "${random_intein}" >> "$file_loc/random_intein.fasta"
-  echo "Random asc: ${random_intein}"
-  echo "Random seq:"
+  #echo "Random asc: ${random_intein}"
+  #echo "Random seq:"
   rnd_seq=${paired_intein_sequences["${random_intein}"]}
   echo "${rnd_seq}" >> "$file_loc/random_intein.fasta"
-  echo "${rnd_seq}"
+  #echo "${rnd_seq}"
 
   #now create subset of data for psidb
   #this value will need editing. Base it off the num of inteins used in dataset
   size_of_arr=${#intein_asc[@]}
-  rand_size=(($size_of_arr/10))
+  ten=5
+  rand_size=$(($size_of_arr / $ten))
   for rand in {0..$rand_size}
     do
       random_index=$[$RANDOM % ${#intein_asc[@]}]
       random_intein=${intein_asc[$random_index]}
       #print random intein to file with asc
       echo "${random_intein}" >> "$file_loc/intein_subset.fasta"
-      echo "Acession: ${random_intein}"
+      #echo "Acession: ${random_intein}"
       seq_from_array=${paired_intein_sequences["${random_intein}"]}
       echo "${seq_from_array}" >> "$file_loc/intein_subset.fasta"
-      echo "Sequence: ${seq_from_array}"
+      #echo "Sequence: ${seq_from_array}"
       #the following ensures no repeats
       delete=($random_index)
       asc_holder=( "${asc_holder[@]/$delete}")
@@ -130,36 +135,36 @@ do
 
 done
 
-#make blast databases from all extein sequences
+#make blast databases from all simulated sequences
 #first need to make each asc unique.
-for extein_file in ${extein_files[@]}
+for simulated_seq_file in ${simulated_sequence_files[@]}
 do
-  sed -i -e 's/\///g' $extein_file
-  sed -i -e 's/\-//g' $extein_file
+  sed -i -e 's/\///g' $simulated_seq_file
+  sed -i -e 's/\-//g' $simulated_seq_file
   count_3=0
   while read -r line;
   do
     if [[ $line =~ ^\> ]]
     then
-      echo "${line}_${count_3}" >> "${extein_file}.temp"
+      echo "${line}_${count_3}" >> "${simulated_seq_file}.temp"
       count_3=$((count_3 + 1))
 
     else
-      echo "${line}" >> "${extein_file}.temp"
+      echo "${line}" >> "${simulated_seq_file}.temp"
     fi
-  done < "$extein_file"
+  done < "$simulated_seq_file"
 
   #rename and remove old fasta file
-  rm $extein_file
-  mv "${extein_file}.temp" $extein_file
+  rm $simulated_seq_file
+  mv "${simulated_seq_file}.temp" $simulated_seq_file
 
   #now for db
-  [[ $extein_file =~ (.*)\/(.*\.fasta) ]]
+  [[ $simulated_seq_file =~ (.*)\/(.*\.fasta) ]]
   file_loc=${BASH_REMATCH[1]}
   out_name=${BASH_REMATCH[2]}
 
-  makeblastdb -in $extein_file -dbtype "prot" -parse_seqids -out "${file_loc}/all_exteins.fasta"
-  mv $extein_file "${file_loc}/all_exteins.fasta"
+  makeblastdb -in $simulated_seq_file -dbtype "prot" -parse_seqids -out "${file_loc}/invaded_seqs.fasta"
+  mv $simulated_seq_file "${file_loc}/invaded_seqs.fasta"
 done
 
 #create paired parameters to run ice_blast with
@@ -197,7 +202,7 @@ for directory in ${sample_directories[@]}
           done
 
         cd $paramdir3
-        perl iceblast.pl -in random_intein.fasta -psidb intein_subset.fasta -outdb all_exteins.fasta -t 32 -id $id_param -e $e_param -ds .25 -v 2
+        perl iceblast.pl -in random_intein.fasta -psidb intein_subset.fasta -outdb invaded_seqs.fasta -t 64 -id $id_param -e $e_param -ds .25 -v 2
         wait
         cd -
 
