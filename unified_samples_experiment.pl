@@ -11,8 +11,9 @@ MAIN();
 
 sub MAIN{
   mkdir("unified_samples_experiment");
-  open(my $allseqs, "+> unified_samples_experiment/all_sample_sequences.fasta");
-  open(my $allinteins, "+> unified_samples_experiment/all_intein_sequences.fasta");
+  mkdir("unified_samples_experiment/1");
+  open(my $allseqs, "+> unified_samples_experiment/1/all_sample_sequences.fasta");
+  open(my $allinteins, "+> unified_samples_experiment/1/all_intein_sequences.fasta");
 
   opendir DIR, $directory ;
   while(my $dir = readdir DIR){
@@ -27,15 +28,15 @@ sub MAIN{
         elsif($dir_sub eq "invaded_seqs.fasta"){
           my %invaded_sample = READIN_FASTA("$directory\/$dir\/$dir_sub");
           foreach my $key (keys %invaded_sample){
-            print $allseqs "$key\_$dir\n";
+            print $allseqs "$key\_sample_$dir\n";
             print $allseqs "$invaded_sample{$key}\n";
           }
         }
         elsif($dir_sub=~/intein_sample_.*/){
           my %intein_sequences = READIN_FASTA("$directory\/$dir\/$dir_sub");
-          my($file_handle)=($dir_sub=~/(.*?)\.fasta/);
+          #my($file_handle)=($dir_sub=~/(.*?)\.fasta/);
           foreach my $key (keys %intein_sequences){
-            print $allinteins "$key\_$dir_sub\n";
+            print $allinteins "$key\_sample_$dir\n";
             print $allinteins "$intein_sequences{$key}\n";
           }
         }
@@ -52,12 +53,12 @@ sub MAIN{
   close $allseqs;
   close $allinteins;
 
-  my(%all_inteins)=READIN_FASTA("unified_samples_experiment/all_intein_sequences.fasta");
+  my(%all_inteins)=READIN_FASTA("unified_samples_experiment/1/all_intein_sequences.fasta");
   my($random_intein_fasta)=RANDOM_INTEIN(\%all_inteins);
   my($intein_subset_fasta)=INTEIN_SUBSET($random_intein_fasta,\%all_inteins);
 
   my($int_subset_db)=MAKE_BLAST_DATABASE($intein_subset_fasta);
-  my($extein_db)=MAKE_BLAST_DATABASE("unified_samples_experiment/all_sample_sequences.fasta");
+  my($extein_db)=MAKE_BLAST_DATABASE("unified_samples_experiment/1/all_sample_sequences.fasta");
 
   my @evals=("1e-3","1e-5","1e-8","1e-10","1e-13","1e-15","1e-18","1e-20");
   my @ids=(".5",".55",".6",".65",".7",".75",".8",".85",".9",".95");
@@ -69,21 +70,22 @@ sub MAIN{
       my $e_for_dir=$evalue;
       $e_for_dir=~s/\-/\_/g;
       my $directory = "$id_for_dir\_$e_for_dir";
-      mkdir("unified_samples_experiment\/$directory");
+      mkdir("unified_samples_experiment\/1\/$directory");
       #print "$dir\n";
 
-      opendir RUN_DIR, "unified_samples_experiment";
+      opendir RUN_DIR, "unified_samples_experiment/1";
       while(my $file = readdir RUN_DIR){
-        if(-d "unified_samples_experiment/$file"){
+        if(-d "unified_samples_experiment/1/$file"){
           next;
         }
         else{
           #print "$file\n";
-          copy("unified_samples_experiment/$file","$home_dir\/unified_samples_experiment\/$directory\/$file");
+          copy("unified_samples_experiment/1/$file","$home_dir\/unified_samples_experiment\/1\/$directory\/$file");
         }
       }
-      copy("iceblast.pl","unified_samples_experiment\/$directory\/iceblast.pl");
-      chdir "$home_dir\/unified_samples_experiment\/$directory";
+      copy("iceblast.pl","unified_samples_experiment\/1\/$directory\/iceblast.pl");
+      chdir "$home_dir\/unified_samples_experiment\/1\/$directory";
+      system("export BLASTDB=$home_dir\/unified_samples_experiment\/1\/$directory");
       ICEBLAST("random_intein.fasta","all_sample_sequences.fasta","intein_subset.fasta",$identity,$evalue);
       chdir "$home_dir";
     }
@@ -131,20 +133,20 @@ sub INTEIN_SUBSET{
     splice(@ascs_of_interest,$rand_index,1);
 	}
 
-  open(my $subset, "+> unified_samples_experiment\/intein_subset.fasta");
+  open(my $subset, "+> unified_samples_experiment\/1\/intein_subset.fasta");
   foreach my $print_asc (keys %random_subset){
     print $subset "$print_asc\n";
     print $subset "$random_subset{$print_asc}\n";
   }
   close $subset;
 
-  return("unified_samples_experiment\/intein_subset.fasta");
+  return("unified_samples_experiment\/1\/intein_subset.fasta");
 }
 
 sub MAKE_BLAST_DATABASE{
   my $input_file = shift;
-  system("makeblastdb -in $input_file -dbtype prot -parse_seqids -out $input_file.blast");
-  return("$input_file.blast");
+  system("makeblastdb -in $input_file -dbtype prot -parse_seqids -out $input_file");
+  return("$input_file");
 }
 
 sub RANDOM_INTEIN{
@@ -154,12 +156,12 @@ sub RANDOM_INTEIN{
 
   my $random_asc = $int_ascs[rand @int_ascs];
 
-  open(my $rand_int, "+> unified_samples_experiment/random_intein.fasta");
+  open(my $rand_int, "+> unified_samples_experiment/1/random_intein.fasta");
   print $rand_int "$random_asc\n";
   print $rand_int "$intein_seqs{$random_asc}\n";
   close $rand_int;
 
-  return("unified_samples_experiment/random_intein.fasta");
+  return("unified_samples_experiment/1/random_intein.fasta");
 }
 
 sub READIN_FASTA{
