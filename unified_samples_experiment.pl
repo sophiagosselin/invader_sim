@@ -6,6 +6,7 @@ use Cwd qw(cwd);
 
 my $directory = "ice_blast_runs";
 my $threads = $ARGV[0];
+system("rm -r unified_samples_experiment");
 
 MAIN();
 
