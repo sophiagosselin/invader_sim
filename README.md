@@ -53,6 +53,8 @@ These parameters are general to the code
 	-sn -> number of simulations to create
 	-ws -> window size for MC chain (how many tips away can an intein jump)
 	-evo -> string to call paml-evolver (likely paml-evolver, or evolver)
+ 	-sub -> (OPTIONAL) Number of intein sequences to invade with out of the set of simulated sequences. 
+  		Useful if you want to simulate X inteins but only invade with Y of them.
 
 Note that the is.param must be formated as:
 extein phylogeny simulation parameters
@@ -65,6 +67,6 @@ An example is.param file:
 
 	-sp 50 -b 1 -d 1 -sf .1 -m .01
 	-sp 10 -b 1 -d 1 -sf .1 -m .1
-	-sn 100 -ws 10 -evo evolver
+	-sn 100 -ws 10 -evo evolver -sub 5
 	-nn 100 -a .5 -cat 4 -m 0
 	-nn 50 -a 1 -cat 4 -m 1
