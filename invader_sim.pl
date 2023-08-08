@@ -22,7 +22,7 @@ $| = 1;
 #naiive mode boolean: 0=naiive mode, 1=startup file inputs
 my $naiive_mode = 0;
 my (%extein_tree_params, %intein_tree_params, %sample_params, %extein_seq_params, %intein_seq_params);
-my %sample_getopt = ("sn"=>"sn=i","ws"=>"ws=i","evo"=>"evo=s");
+my %sample_getopt = ("sn"=>"sn=i","ws"=>"ws=i","evo"=>"evo=s","sub"=>"sub:i");
 my %tree_sim_getopt = ("sp"=>"sp=i","b"=>"b=s","d"=>"d=s","sf"=>"sf=s","m"=>"m=s");
 my %sequence_sim_getopt = ("nn"=>"nn=s","a"=>"a=s","cat"=>"cat=s","m"=>"m=s");
 
@@ -44,7 +44,7 @@ sub STARTUP{
     die
 "\n\n\n****************************************************************************
 
-INVADER-SIM (Intein Invasion Sequence Simulator) v1.0.0\n
+INVADER-SIM (Intein Invasion Sequence Simulator) v1.1.0\n
 
 Author: Gosselin Sophia
 Bug reporting: https://github.com/sophiagosselin/evolver_pipeline
@@ -79,6 +79,7 @@ Else, a parameter file (is.param) can be provided using the following parameters
 -sn -> number of simulations to create
 -ws -> window size for MC chain (how many tips away can an intein jump)
 -evo -> string to call paml-evolver (likely paml-evolver, or evolver)
+-sub -> (OPTIONAL) Number of intein sequences to invade with out of the set of simulated sequences. Useful if you want to simulate X inteins but only invade with Y of them.
 
 Note that the is.param must be formated as:
 extein phylogeny simulation parameters
@@ -90,7 +91,7 @@ intein sequence simulation parameters
 An example is.param file:
 -sp 50 -b 1 -d 1 -sf .1 -m .01
 -sp 10 -b 1 -d 1 -sf .1 -m .1
--sn 100 -ws 10 -evo evolver
+-sn 100 -ws 10 -evo evolver -sub 5
 -nn 100 -a .5 -cat 4 -m 0
 -nn 50 -a 1 -cat 4 -m 1 \n\n";
   }
@@ -130,7 +131,6 @@ An example is.param file:
 }
 
 sub MAIN{
-  #Why is this necessary? I'm not sure. TLDR if this isn't here, the program works fine in an interactive session, but hangs if submitted via a batch script
   #get user inputs and test until they are satisfied
   if($naiive_mode == 0){
     %extein_tree_params = test_parameters("extein");
@@ -432,11 +432,26 @@ sub invade_exteins{
       push(@extein_tip_ids,$id_of_node);
     }
 
+    #if subset mode is enabled, randomly select the subset of intein tips now.
+    my @invaded_inteins;
+    if($sample_params{"sub"}!=0){
+      my @random_subsample;
+      my @intein_tips_for_sub=@intein_tip_ids;
+      for(my $sub_counter=0; $sub_counter<=$sample_params{"sub"}; $sub_counter++){
+        my $rand_tip = splice(@intein_tips_for_sub, rand @intein_tips_for_sub, 1);
+        push(@random_subsample,$rand_tip);
+      }
+      #pushes unused intein to the invaded list, such that they cannot be used again
+      @invaded_inteins=@intein_tips_for_sub;
+      @intein_tip_ids=@random_subsample;
+    }
+    else{}
+
     #select a random intein and random extein to invade w/ said intein
     #then remove them from the list of valid invaders/invasion sites
     #then save pairing of object refs
     print "Preparing starting point for invasion.\n\n";
-    my (@invaded_exteins,@invaded_inteins,%paired_sequence_archive);
+    my (@invaded_exteins,%paired_sequence_archive);
     my $intein_tip = splice(@intein_tip_ids, rand @intein_tip_ids, 1);
     my $extein_tip = splice(@extein_tip_ids, rand @extein_tip_ids, 1);
     my %paired_extein_intein_tip_ids = ($extein_tip => $intein_tip);

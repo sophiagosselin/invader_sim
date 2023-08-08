@@ -6,9 +6,9 @@ use warnings;
 
 my $directory = "ice_blast_runs";
 
-open(my $stats, "+> results.txt");
+open(my $stats, "+> indv_sample_results.txt");
 #header
-print $stats "Sample_Number\tIdentity_Value\tE_Value\tMatches_Found\tInteins_Found\tNon_Intein_Matches\n";
+print $stats "Sample_Number\tIdentity_Value\tE_Value\tMatches_Found\tInteins_Found\tNon_Intein_Matches\tAverage_Length_of_Intein_Found\n";
 
 MAIN();
 
@@ -27,20 +27,23 @@ sub MAIN{
           while (my $dir_sub_sub = readdir DIR_SUB_SUB){
             # $dir_sub_sub is the directory where ice blast ran
             if($dir_sub_sub eq "output"){
+              #print "File is $directory\/$dir\/$dir_sub\/$dir_sub_sub\/all_matches.fasta\n";
               my %output_sequences=READIN_FASTA("$directory\/$dir\/$dir_sub\/$dir_sub_sub\/all_matches.fasta");
-              my $intein_counter = my $match_counter = my $fp_matches =0;
+              my $seq_avg = my $intein_counter = my $match_counter = my $fp_matches =0;
               foreach my $asc (keys %output_sequences){
                 $match_counter++;
                 if($asc=~/w_intein/){
                   $intein_counter++;
+                  $seq_avg+=length($output_sequences{$asc});
                 }
                 else{
                   $fp_matches++;
                 }
               }
+              $seq_avg=$seq_avg/$intein_counter;
               my($identity,$eval)=($dir_sub=~/(.*?)(1e.*)/);
               #print "Troubleshooting\nSample number is $dir\nIdentity is $identity\nEval is $eval\nNum of Matches is $match_counter\nNum of inteins is $intein_counter\nNum of FPs is $fp_matches\n";
-              print $stats "$dir\t$identity\t$eval\t$match_counter\t$intein_counter\t$fp_matches\n";
+              print $stats "$dir\t$identity\t$eval\t$match_counter\t$intein_counter\t$fp_matches\t$seq_avg\n";
             }
             else{
               next;
