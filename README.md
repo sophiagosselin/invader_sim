@@ -8,6 +8,7 @@ Dependencies:
 
     perl (5.30.1)
       -BioPerl (1.7.8)
+      -Bio::TreeIO
 
     R (4.3.1)
       -ape (5.7)
