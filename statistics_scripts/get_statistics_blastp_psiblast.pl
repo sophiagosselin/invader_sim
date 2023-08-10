@@ -6,78 +6,127 @@ use warnings;
 
 my $directory = "ice_blast_runs";
 
-open(my $stats, "+> indv_sample_results.txt");
+open(my $blastp_stats, "+> blastp_sample_results.txt");
+open(my $psiblast_stats, "+> psiblast_sample_results.txt");
+
 #header
-print $stats "Sample_Number\tIdentity_Value\tE_Value\tMatches_Found\tInteins_Found\tNon_Intein_Matches\tAverage_Length_of_Intein_Found\n";
+print $blastp_stats "Sample_Number\tE_Value\tMatches_Found\tInteins_Found\tNon_Intein_Matches\tAverage_Length_of_Intein_Found\n";
+print $psiblast_stats "Sample_Number\tE_Value\tMatches_Found\tInteins_Found\tNon_Intein_Matches\tAverage_Length_of_Intein_Found\n";
 
 MAIN();
 
-close $stats;
+close $blastp_stats;
+close $psiblast_stats;
 
 sub MAIN{
   opendir DIR, $directory ;
-  while(my $dir = readdir DIR){
-    # $dir will be the sample number
-    if(-d "$directory\/$dir"){
-      opendir DIR_SUB, "$directory\/$dir";
-      while (my $dir_sub = readdir DIR_SUB){
-        # $dir_sub will be the parameter directory
-        if(-d "$directory\/$dir\/$dir_sub"){
-          opendir DIR_SUB_SUB, "$directory\/$dir\/$dir_sub";
-          while (my $dir_sub_sub = readdir DIR_SUB_SUB){
-            # $dir_sub_sub is the directory where ice blast ran
-            if($dir_sub_sub eq "output"){
-              #print "File is $directory\/$dir\/$dir_sub\/$dir_sub_sub\/all_matches.fasta\n";
-              my %output_sequences=READIN_FASTA("$directory\/$dir\/$dir_sub\/$dir_sub_sub\/all_matches.fasta");
-              my $seq_avg = my $intein_counter = my $match_counter = my $fp_matches =0;
-              foreach my $asc (keys %output_sequences){
-                $match_counter++;
-                if($asc=~/w_intein/){
-                  $intein_counter++;
-                  $seq_avg+=length($output_sequences{$asc});
-                }
-                else{
-                  $fp_matches++;
-                }
+  while(my $sample_number = readdir DIR){
+    if(-d "$directory\/$sample_number"){
+      opendir DIR_SUB, "$directory\/$sample_number";
+      while (my $sample_contents = readdir DIR_SUB){
+        
+        #for the blastp experiment
+        if($sample_contents eq "blastp"){
+          opendir BLASTP, "$directory\/$sample_number\/$sample_contents";
+          while(my $blastp_runs = readdir BLASTP){
+            opendir BLASTP_EVAL, "$directory\/$sample_number\/$sample_contents\/$blastp_runs";
+            while(my $blastp_sample = readdir BLASTP_EVAL){
+              
+              #directory of interest
+              if($blastp_sample eq "blastp.blast"){
+                #gets statistics
+                my($blastp_matches,$blastp_inteins,$blastp_avg)=PARSE_BLAST("$directory\/$sample_number\/$sample_contents\/$blastp_runs\/$blastp_sample");
+                my $non_inteins = $blastp_matches-$blastp_inteins;
+
+                #print to file
+                print $blastp_stats "$sample_number\t$blastp_runs\t$blastp_matches\t$blastp_inteins\t$non_inteins\t$blastp_avg\n";
               }
-              $seq_avg=$seq_avg/$intein_counter;
-              my($identity,$eval)=($dir_sub=~/(.*?)(1e.*)/);
-              #print "Troubleshooting\nSample number is $dir\nIdentity is $identity\nEval is $eval\nNum of Matches is $match_counter\nNum of inteins is $intein_counter\nNum of FPs is $fp_matches\n";
-              print $stats "$dir\t$identity\t$eval\t$match_counter\t$intein_counter\t$fp_matches\t$seq_avg\n";
+
+              else{
+                next;
+              }
             }
-            else{
-              next;
-            }
+            closedir BLASTP_EVAL;
           }
+          closedir BLASTP;
         }
+
+        #for psiblast results
+        elsif($sample_contents eq "psiblast"){
+          opendir PSIBLAST, "$directory\/$sample_number\/$sample_contents";
+          while(my $psiblast_runs = readdir PSIBLAST){
+            opendir PSIBLAST_EVAL, "$directory\/$sample_number\/$sample_contents\/$psiblast_runs";
+            while(my $psiblast_sample = readdir PSIBLAST_EVAL){
+              
+              #directory of interest
+              if($psiblast_sample eq "psiblast.blast"){
+                #gets statistics
+                my($psiblast_matches,$psiblast_inteins,$psiblast_avg)=PARSE_BLAST("$directory\/$sample_number\/$sample_contents\/$psiblast_runs\/$psiblast_sample");
+                my $non_inteins = $psiblast_matches-$psiblast_inteins;
+
+                #print to file
+                print $psiblast_stats "$sample_number\t$psiblast_runs\t$psiblast_matches\t$psiblast_inteins\t$non_inteins\t$psiblast_avg\n";
+              }
+
+              else{
+                next;
+              }
+            }
+            closedir PSIBLAST_EVAL;
+          }
+          closedir PSIBLAST;
+        
+        
+        }
+        
+        #skip otherwise
         else{
           next;
         }
+
       }
+      closedir DIR_SUB;
     }
+
     else{
       next;
     }
+
   }
+  closedir DIR;
 }
 
-sub READIN_FASTA{
-  #takes name of fasta formatted file as input
-  #returns hash of sequences with ascessions as keys
-  my $filehandle = shift;
-  my %seq_data;
-  my $asc_holder="";
-  open(IN, "< $filehandle");
-  while(<IN>){
+sub PARSE_BLAST{
+  #takes blast file as input
+  #returns file information (#of matches, # of intein matches, average intein length)
+
+  my $blast_file = shift;
+  my %matches;
+  my $num_matches = my $intein_matches = my $length_sum = 0;
+
+  open(my $blast, "< $blast_file");
+  while(<$blast>){
     chomp;
-    if($_=~/\>/){
-      $asc_holder=$_;
-      $seq_data{$asc_holder}="";
+    my @match_split = split(/\t/,$_);
+    #ignore secondary matches to the same database entry
+    if($matches{$match_split[1]}){
+      next;
     }
     else{
-      $seq_data{$asc_holder}.=$_;
+      $matches{$match_split[1]}="Y";
+      $num_matches++;
+      if($match_split[1]=~/intein/){
+        $intein_matches++;
+        $length_sum+= $match_split[3];
+      }
+      else{
+        next;
+      }
     }
   }
-  close IN;
-  return(%seq_data);
+  close $blast;
+
+  my $average_l = $length_sum/$intein_matches;
+
+  return($num_matches,$intein_matches,$average_l);
 }
