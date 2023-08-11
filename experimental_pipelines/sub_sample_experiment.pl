@@ -30,7 +30,7 @@ sub MAIN{
             while (my $files = readdir ICE){
                 
                 #skip over directories
-                if(-d $files){
+                if(-d "$files"){
                     next;
                 }
 
