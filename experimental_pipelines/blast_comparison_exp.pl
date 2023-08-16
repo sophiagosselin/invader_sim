@@ -4,8 +4,6 @@ use warnings;
 use File::Copy;
 use Cwd qw(cwd);
 
-#this will get me some statistics
-
 my $directory = "ice_blast_runs";
 my @evals=("1e-3","1e-5","1e-8","1e-10","1e-13","1e-15","1e-18","1e-20");
 

@@ -52,9 +52,9 @@ do
   file_name=${BASH_REMATCH[1]}
 
   #move files to new subdirectory
-  mv $file "ice_blast_runs/$counter/"
-  mv  simulated_sequences/extein/$extein/*.fasta "ice_blast_runs/$counter/extein_sample_$extein.fasta"
-  mv  simulated_sequences/intein/$intein/*.fasta "ice_blast_runs/$counter/intein_sample_$intein.fasta"
+  cp $file "ice_blast_runs/$counter/"
+  cp  simulated_sequences/extein/$extein/*.fasta "ice_blast_runs/$counter/extein_sample_$extein.fasta"
+  cp  simulated_sequences/intein/$intein/*.fasta "ice_blast_runs/$counter/intein_sample_$intein.fasta"
   cp iceblast.pl "ice_blast_runs/$counter/"
 
   #push to array of subdirectory and inteins
@@ -113,7 +113,7 @@ do
   #now create subset of data for psidb
   #this value will need editing. Base it off the num of inteins used in dataset
   size_of_arr=${#intein_asc[@]}
-  ten=5
+  ten=10
   rand_size=$(($size_of_arr / $ten))
   for rand in {0..$rand_size}
     do
