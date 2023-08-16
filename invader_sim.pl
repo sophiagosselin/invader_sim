@@ -252,6 +252,10 @@ sub parse_and_check_inputs{
           chomp $new_parameter;
           $parsed_inputs{$input}=$new_parameter;
         }
+        elsif($input eq "sub"){
+          $parsed_inputs{$input}=0;
+          next;
+        }
         else{
           die "$input not defined\n";
         }
@@ -455,6 +459,7 @@ sub invade_exteins{
     my $intein_tip = splice(@intein_tip_ids, rand @intein_tip_ids, 1);
     my $extein_tip = splice(@extein_tip_ids, rand @extein_tip_ids, 1);
     my %paired_extein_intein_tip_ids = ($extein_tip => $intein_tip);
+    $paired_sequence_archive{$extein_tip}=$intein_tip;
     push(@invaded_exteins,$extein_tip);
     push(@invaded_inteins,$intein_tip);
     #print "First pair is Extein: $extein_tip Intein: $intein_tip\n";
