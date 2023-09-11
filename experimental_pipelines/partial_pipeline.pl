@@ -17,11 +17,11 @@ MAIN();
 sub MAIN{
 
     #run invader sim w/o subsampling - edit desired parameters here!
-    INVADER_SIM("-sp 1000 -b 1 -d 1 -sf .1 -m .1\n-sp 100 -b 2 -d 1 -sf .5 -m 1\n-sn 100 -ws 100 -evo evolver\n-nn 500 -a .5 -cat 4 -m 1\n-nn 300 -a 1 -cat 4 -m 1");
+    #INVADER_SIM("-sp 1000 -b 1 -d 1 -sf .1 -m .1\n-sp 100 -b 2 -d 1 -sf .5 -m 1\n-sn 100 -ws 100 -evo evolver\n-nn 500 -a .5 -cat 4 -m 1\n-nn 300 -a 1 -cat 4 -m 1");
 
     #----ICEBLAST baseline experiment----#
     #copy all files into each sample's directory
-    my($hashref1,$hashref2,$hashref3)=BASELINE_EXPERIMENT("baseline_original_experiment");
+    #my($hashref1,$hashref2,$hashref3)=BASELINE_EXPERIMENT("baseline_original_experiment");
 
     #----Unified samples experiment----#
     #make unified sample fasta file
@@ -52,14 +52,11 @@ sub MAIN{
     rmove("intein","invader_sim_with_sub_sampling\/intein");
 
     #----Statistics----#
-    STATISTICS($hashref1,$hashref2,$hashref3,$hashref4,$hashref5,$hashref6,$hashref7,$hashref8,$hashref9,$hashref10,$hashref11,$hashref12);
+    STATISTICS($hashref4,$hashref5,$hashref6,$hashref7,$hashref8,$hashref9,$hashref10,$hashref11,$hashref12);
 
 }
 
 sub STATISTICS{
-    my %original_baseline_blastp_files = %{ my $hr1 = shift};
-    my %original_baseline_psiblast_files = %{ my $hr2 = shift};
-    my %original_baseline_iceblast_files = %{ my $hr3 = shift};
     my %original_unified_blastp_files = %{ my $hr4 = shift};
     my %original_unified_psiblast_files = %{ my $hr5 = shift};
     my %original_unified_iceblast_files = %{ my $hr6 = shift};
@@ -69,15 +66,6 @@ sub STATISTICS{
     my %subsample_unified_blastp_files = %{ my $hr10 = shift};
     my %subsample_unified_psiblast_files = %{ my $hr11 = shift};
     my %subsample_unified_iceblast_files = %{ my $hr12 = shift};
-
-    #original sample blastp
-    PARSE_BLAST_HASH(\%original_baseline_blastp_files,"original_baseline_blastp_stats.txt",0);
-
-    #original sample psiblast
-    PARSE_BLAST_HASH(\%original_baseline_psiblast_files,"original_baseline_psiblast_stats.txt",0);
-
-    #original sample iceblast
-    PARSE_FASTA_HASH(\%original_baseline_iceblast_files,"original_baseline_iceblast_stats.txt",0);
 
     #unified sample blastp
     PARSE_BLAST_HASH(\%original_unified_blastp_files,"unified_baseline_blastp_stats.txt",1);
