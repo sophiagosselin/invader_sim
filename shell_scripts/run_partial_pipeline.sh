@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=simulation_pipe
+#SBATCH --job-name=simulation_partial_pipe
 #SBATCH --nodes=1
 #SBATCH --qos=general
 #SBATCH --ntasks=1
@@ -25,4 +25,4 @@ module load usearch
 #add libraries to path
 export PERL5LIB=/home/FCAM/sgosselin/perl5/lib/perl5
 
-perl complete_pipeline.pl 4
+perl partial_pipeline.pl 4

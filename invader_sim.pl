@@ -441,7 +441,7 @@ sub invade_exteins{
     if($sample_params{"sub"}!=0){
       my @random_subsample;
       my @intein_tips_for_sub=@intein_tip_ids;
-      for(my $sub_counter=0; $sub_counter<=$sample_params{"sub"}; $sub_counter++){
+      for(my $sub_counter=0; $sub_counter<$sample_params{"sub"}; $sub_counter++){
         my $rand_tip = splice(@intein_tips_for_sub, rand @intein_tips_for_sub, 1);
         push(@random_subsample,$rand_tip);
       }
