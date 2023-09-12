@@ -21,19 +21,11 @@ sub MAIN{
 
     #----ICEBLAST baseline experiment----#
     #copy all files into each sample's directory
-<<<<<<< HEAD
-    my($hashref1,$hashref2,$hashref3)=BASELINE_EXPERIMENT("baseline_experiment");
-
-    #----Unified samples experiment----#
-    #make unified sample fasta file
-    my($hashref4,$hashref5,$hashref6)=UNIFIED_EXPERIMENT("baseline_experiment","unified_samples_experiment");
-=======
     my($hashref1,$hashref2,$hashref3)=BASELINE_EXPERIMENT("baseline_original_experiment");
 
     #----Unified samples experiment----#
     #make unified sample fasta file
     my($hashref4,$hashref5,$hashref6)=UNIFIED_EXPERIMENT("baseline_original_experiment","baseline_unified_experiment");
->>>>>>> 3fee5fe5da41b1da4e377e50e792fb5c2f644629
 
     #----Cleanup----#
     mkdir("invader_sim_no_sub_sampling");
@@ -47,17 +39,10 @@ sub MAIN{
     INVADER_SIM("-sp 1000 -b 1 -d 1 -sf .1 -m .1\n-sp 1000 -b 2 -d 1 -sf .5 -m 1\n-sn 100 -ws 100 -evo evolver -sub 100\n-nn 500 -a .5 -cat 4 -m 1\n-nn 300 -a 1 -cat 4 -m 1");
     
     #----Baseline---#
-<<<<<<< HEAD
-    my($hashref7,$hashref8,$hashref9)=BASELINE_EXPERIMENT("subsample_baseline_experiment");
-    
-    #----Unified----#
-    my($hashref10,$hashref11,$hashref12)=UNIFIED_EXPERIMENT("subsample_baseline_experiment","subsample_unified_samples_experiment");
-=======
     my($hashref7,$hashref8,$hashref9)=BASELINE_EXPERIMENT("subsample_original_experiment");
     
     #----Unified----#
     my($hashref10,$hashref11,$hashref12)=UNIFIED_EXPERIMENT("subsample_original_experiment","subsample_unified_experiment");
->>>>>>> 3fee5fe5da41b1da4e377e50e792fb5c2f644629
 
     #----Cleanup 2----#
     mkdir("invader_sim_with_sub_sampling");
@@ -297,23 +282,15 @@ sub UNIFIED_EXPERIMENT{
     my(%blastp_r,%psiblast_r,%iceblast_r);
 
     mkdir("$exp_directory");
-<<<<<<< HEAD
-=======
     my $unique_counter = 0;
->>>>>>> 3fee5fe5da41b1da4e377e50e792fb5c2f644629
     open(my $unified, "+> $exp_directory\/all_sample_sequences.fasta");
     my @invaded_seq_files = glob "invaded_sequences/*";
     foreach my $invaded_fasta (@invaded_seq_files){
         my(%sequence_data) = READIN_FASTA($invaded_fasta);
         foreach my $asc (keys %sequence_data){
-<<<<<<< HEAD
-            print $unified "$asc\n";
-            print $unified "$sequence_data{$asc}\n";
-=======
             print $unified "$asc\_$unique_counter\n";
             print $unified "$sequence_data{$asc}\n";
             $unique_counter++;
->>>>>>> 3fee5fe5da41b1da4e377e50e792fb5c2f644629
         }
         $counter++;
     }
